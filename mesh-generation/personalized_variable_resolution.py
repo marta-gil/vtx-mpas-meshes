@@ -18,7 +18,8 @@ def distance_latlon_matrix(lat, lon, lat_ref=0., lon_ref=0., do_tile=False):
     newlon = lon_ref - lon
     newlat = lat_ref - lat
 
-    haver_formula = np.sin(newlat / 2.0) ** 2 + np.cos(lat) * np.cos(lat_ref) * np.sin(newlon / 2.0) ** 2
+    haver_formula = np.sin(newlat / 2.0) ** 2 + np.cos(lat) * \
+                    np.cos(lat_ref) * np.sin(newlon / 2.0) ** 2
 
     dist = 2 * np.arcsin(np.sqrt(haver_formula))
     km = 6367 * dist  # 6367 for distance in KM for miles use 3958
@@ -205,7 +206,6 @@ def plot_cartopy(darray, ax=None, title='',  borders=None, **kwargs):
 
     if borders is None:
         borders = find_borders(darray.lat.values, darray.lon.values)
-        print(borders)
 
     ax.set_extent(borders, crs=ccrs.PlateCarree())
 
