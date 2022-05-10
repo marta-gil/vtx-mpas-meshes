@@ -1,7 +1,7 @@
 import argparse
 
 from vtxmpasmeshes.mesh_generator import variable_resolution_latlonmap
-from vtxmpasmeshes.plot_utilities import view_resolution_map
+from vtxmpasmeshes.mpas_plots import view_resolution_map
 
 
 parser = argparse.ArgumentParser(

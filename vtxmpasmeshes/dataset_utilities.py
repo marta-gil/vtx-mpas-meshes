@@ -62,7 +62,7 @@ def add_mpas_mesh_variables(ds):
             elif newv == 'resolution':
                 radius_circle = ds.attrs.get('sphere_radius', 1.0)
                 if radius_circle == 1:
-                    print('need to correct to earth radius!!')
+                    #print('need to correct to earth radius!!')
                     correction_rad_earth = 6371220.0
                 else:
                     correction_rad_earth = 1

@@ -9,8 +9,8 @@ from mpas_tools.mesh.conversion import convert
 from mpas_tools.io import write_netcdf
 
 from vtxmpasmeshes.jigsaw_generator import jigsaw_gen_sph_grid
-from vtxmpasmeshes.plot_utilities import view_resolution_map, \
-    plot_mpas_darray
+from vtxmpasmeshes.plot_utilities import plot_mpas_darray
+from vtxmpasmeshes.mpas_plots import view_resolution_map, view_mpas_regional_mesh
 from vtxmpasmeshes.dataset_utilities import distance_latlon_matrix, \
     open_mpas_regional_file
 
@@ -327,13 +327,7 @@ def full_generation_process(mpas_grid_file, grid, redo=True,
     os.system('rm -f ' + mpas_grid_file_tmp)
 
     if do_plots:
-        ds = open_mpas_regional_file(mpas_grid_file)
-
-        plot_mpas_darray(ds, 'resolution',
-                         cmap='Spectral',
-                         ax=None,
-                         outfile=path_save + '/resolution_mesh.png',
-                         title='<NAME>: <VAR>',
-                         name=os.path.basename(mpas_grid_file))
+        view_mpas_regional_mesh(mpas_grid_file,
+                                outfile=path_save + '/resolution_mesh.png')
 
     return mpas_grid_file, graph_info_file

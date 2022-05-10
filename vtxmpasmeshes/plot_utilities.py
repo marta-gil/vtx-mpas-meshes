@@ -1,60 +1,80 @@
-import os.path
-
 import xarray as xr
 import numpy as np
-import shapely
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-from cartopy.geodesic import Geodesic
-
-from vtxmpasmeshes.dataset_utilities import open_mpas_regional_file
 
 
-mpas_mesh_src_plots = ['latitude', 'longitude', 'latitudeVertex',
-                       'longitudeVertex', 'verticesOnCell']
+# OPEN AND CLOSE PLOTS
+
+def start_cartopy_map_axis(zorder=1):
+    ax = plt.axes(projection=ccrs.PlateCarree())  # projection type
+    add_cartopy_details(ax, zorder=zorder)
+    return ax
 
 
-def are_mpas_cells_plottable(ds):
-    if 'nCells' not in ds.dims:
-        return False
+def add_cartopy_details(ax, zorder=1):
+    ax.add_feature(cfeature.BORDERS, linestyle=':', zorder=zorder)
+    ax.coastlines(resolution='10m', zorder=zorder)
 
-    varsds = list(ds.data_vars.keys())
-    if all(x in varsds for x in mpas_mesh_src_plots):
-        return True
-    else:
-        return False
+    gl = ax.gridlines(draw_labels=True, alpha=0.5, linestyle='--',
+                      zorder=zorder)
+    gl.top_labels = False
+    gl.right_labels = False
 
 
-def colorvalue(val, cmap='Spectral', vmin=None, vmax=None):
-    """
-    Given a value and the range max, min, it returns the associated
-    color of the desired cmap.
-    :param val: float
-    :param cmap: str
-    :param vmin: float (default None)
-    :param vmax: float (default None)
-    :return: cm(norm_val): color
-    """
-    # Get a colormap instance, defaulting to rc values if name is None.
-    cm = mpl.cm.get_cmap(cmap, None)
-    if vmin is None:
-        vmin = xr.DataArray.min().values  # min value of the array
-    if vmax is None:
-        vmax = xr.DataArray.max().values  # max value of the array
-    if vmin == vmax:
-        # A class which, when called, linearly normalizes data into the
-        # [0.0, 1.0] interval.
-        norm_val = mpl.colors.Normalize(vmin=vmin - 1, vmax=vmax + 1,
-                                        clip=True)(val)
-    else:
-        norm_val = mpl.colors.Normalize(vmin=vmin, vmax=vmax,
-                                        clip=True)(val)
-    return cm(norm_val)
+def close_plot(fig=None, size_fig=None, pdf=None, outfile=None,
+               force_show=False):
 
+    if size_fig is None:
+        size_fig = [10, 8]
+
+    if fig is None:
+        fig = plt.gcf()
+    fig.set_size_inches(size_fig)
+
+    if outfile is not None:
+        plt.savefig(outfile)
+
+    if pdf is not None:
+        pdf.savefig(fig)
+
+    if (outfile is None and pdf is None) or force_show:
+        plt.show()
+
+    plt.close()
+
+
+# HANDLE PLOT KWARGS FROM ALL PASSED KWARGS
+
+def set_plot_kwargs(da=None, list_darrays=None, **kwargs):
+    plot_kwargs = {k: v for k, v in kwargs.items()
+                   if k in ['cmap', 'vmin', 'vmax']}
+
+    if 'cmap' not in plot_kwargs:
+        plot_kwargs['cmap'] = 'Spectral'
+
+    vmin, vmax = None, None
+    if da is not None:
+        vmin = np.min(da)
+        vmax = np.max(da)
+    elif list_darrays is not None:
+        vmin = np.min([v.min() for v in list_darrays if v is not None])
+        vmax = np.max([v.max() for v in list_darrays if v is not None])
+
+    if 'vmin' not in plot_kwargs:
+        if vmin is not None:
+            plot_kwargs['vmin'] = vmin
+
+    if 'vmax' not in plot_kwargs:
+        if vmax is not None:
+            plot_kwargs['vmax'] = vmax
+    return plot_kwargs
+
+
+# BORDERS OF THE PLOT
 
 def find_borders(lats, lons, margin='factor2'):
     lats = lats.flatten()
@@ -83,14 +103,144 @@ def find_borders(lats, lons, margin='factor2'):
     return limits
 
 
-def get_max_borders(list_results, margin='factor2'):
-    borders = np.array([r.get_borders(margin=margin) for r in list_results])
-    max_borders = borders[:, 0].min(), borders[:, 1].max(), \
-                  borders[:, 2].min(), borders[:, 3].max()
-    return np.array(max_borders)
+# BASIC LATLON PLOT
+
+def plot_latlon_cartopy(darray, ax=None, title='', borders=None, **kwargs):
+    # For a DataArray that has lat/lon coordinates
+
+    # Start the axis
+    if ax is None:
+        ax = start_cartopy_map_axis(zorder=4)
+
+    # Set the extent
+    if borders is None:
+        borders = find_borders(darray.lat.values, darray.lon.values)
+        # borders = [minlon, maxlon, minlat, maxlat]
+    ax.set_extent(borders, crs=ccrs.PlateCarree())
+
+    # Plot the array (automatic xarray plot)
+    darray.plot(ax=ax, **kwargs)  # plot the resolution
+
+    ax.set_title(title)
+    return
 
 
-def add_colorbar(axs, fig, label=None, **plot_kwargs):
+# MPAS PLOT
+
+def colorvalue(val, cmap='Spectral', vmin=None, vmax=None):
+    """
+    Given a value and the range max, min, it returns the associated
+    color of the desired cmap.
+    :param val: float
+    :param cmap: str
+    :param vmin: float (default None)
+    :param vmax: float (default None)
+    :return: cm(norm_val): color
+    """
+    # Get a colormap instance, defaulting to rc values if name is None.
+    cm = mpl.cm.get_cmap(cmap, None)
+    if vmin is None:
+        vmin = xr.DataArray.min().values  # min value of the array
+    if vmax is None:
+        vmax = xr.DataArray.max().values  # max value of the array
+    if vmin == vmax:
+        # A class which, when called, linearly normalizes data into the
+        # [0.0, 1.0] interval.
+        norm_val = mpl.colors.Normalize(vmin=vmin - 1, vmax=vmax + 1,
+                                        clip=True)(val)
+    else:
+        norm_val = mpl.colors.Normalize(vmin=vmin, vmax=vmax,
+                                        clip=True)(val)
+    return cm(norm_val)
+
+
+def plot_mpas_darray(ds, vname, ax=None, outfile=None, **kwargs):
+
+    if vname not in ds.data_vars:
+        print('Unplottable Data Array ' + vname)
+        print(ds)
+        return
+
+    da = ds[vname]
+    for coord in ['time', 'lev']:
+        if coord in da.dims:
+            print('Selecting first slice for ' + coord + '.')
+            da = da.isel({coord: 0})
+
+    final = False
+    if ax is None:
+        final = True
+        ax = start_cartopy_map_axis()
+
+    if 'borders' not in kwargs:
+        lats = ds['latitude'].values.flatten()
+        lons = ds['longitude'].values.flatten()
+        borders = find_borders(lats, lons)
+    else:
+        borders = kwargs['borders']
+
+    ax.set_extent(borders, crs=ccrs.PlateCarree())
+
+    plot_kwargs = set_plot_kwargs(da=da, **kwargs)
+
+    numvert = float(ds.dims['nVertices'])
+    last_val = float(ds['verticesOnCell'].sel(maxEdges=-1).values.mean())
+
+    if abs(last_val - numvert) < last_val / 2:
+        fillval = numvert
+    else:
+        fillval = 0.0
+
+    for i, cell in enumerate(da['nCells'].values):
+        value = da.sel(nCells=cell)
+
+        vals = ds['verticesOnCell'].sel(nCells=cell).values
+
+        vals = vals[vals != fillval] - 1
+
+        lats = ds['latitudeVertex'].sel(nVertices=vals)
+        lons = ds['longitudeVertex'].sel(nVertices=vals)
+
+        color = colorvalue(value, **plot_kwargs)
+
+        ax.fill(lons, lats, edgecolor=None, linewidth=0.0,
+                facecolor=color)
+
+    units = da.attrs.get('units', '')
+    name = kwargs.get('name', '')
+    ncells = str(len(da.values.flatten()))
+    title = kwargs.get('title', '')
+    title = title.replace('<VAR>', vname).replace('<UNITS>', units)
+    title = title.replace('<NAME>', name).replace('<NCELLS>', ncells)
+    ax.set_title(title)
+
+    if final:
+        title_legend = kwargs.get('title_legend', '<VAR>: <UNITS>')
+        title_legend = title_legend.replace('<VAR>', vname)
+        title_legend = title_legend.replace('<UNITS>', units)
+        add_colorbar(ax, label=title_legend, **plot_kwargs)
+
+        close_plot(outfile=outfile)
+    return
+
+
+# TOOLS FOR MULTIPLE PLOTS (Also can be used for 1 plot)
+
+def add_colorbar(axs, fig=None, label=None, **plot_kwargs):
+    if fig is None:
+        fig = plt.gcf()
+
+    try:
+        x = axs[0, 0]
+    except:
+        try:
+            x = axs[0]
+            n = len(axs)
+        except:
+            axs = np.array([axs]).reshape([1, 1])
+        else:
+            axs = axs.reshape([n, 1])
+
     cbar = fig.colorbar(
         mpl.cm.ScalarMappable(
             norm=mpl.colors.Normalize(vmin=plot_kwargs['vmin'],
@@ -125,263 +275,12 @@ def get_plot_size(numplots, nrows=None, ncols=None):
     return nrows, ncols
 
 
-def plot_cartopy(darray, ax=None, title='',  borders=None, **kwargs):
-    if ax is None:
-        ax = plt.axes(projection=ccrs.PlateCarree())
-
-    if borders is None:
-        borders = find_borders(darray.lat.values, darray.lon.values)
-
-    ax.set_extent(borders, crs=ccrs.PlateCarree())
-
-    darray.plot(ax=ax, **kwargs)  # plot the resolution
-
-    ax.set_title(title)
-
-    ax.add_feature(cfeature.BORDERS, linestyle=':')
-    ax.coastlines(resolution='10m')
-    gl = ax.gridlines(draw_labels=True, alpha=0.5, linestyle='--')
-    gl.top_labels = False
-    gl.right_labels = False
-
-    return
-
-
-def view_resolution_map(ds, pdfname=None, list_distances=None):
-
-    kwargs = {'cmap': 'Spectral', 'vmin': 0, 'levels': 41}
-
-    if list_distances is None:
-        list_distances = [1000, 500, 200, 50]
-
-    pdf = None
-    if pdfname is not None:
-        pdf = PdfPages(pdfname)
-
-    # Region
-    # we don't want to plot too much
-    region = ds.where(ds['distance'] <= max(list_distances))
-    region = region.dropna('lat', how='all').dropna('lon', how='all')
-    my_zero = region['distance'].argmin(['lat', 'lon'])
-    mylat = int(my_zero['lat'])
-    mylon = int(my_zero['lon'])
-
-    axis = region.isel(lat=mylat, lon=range(mylon, region.dims['lon']))
-    axis = axis.squeeze(drop=True)
-    axis = axis.assign_coords({'distance': axis['distance']})
-    axis = axis.swap_dims({'lon': 'distance'})
-
-    for di in list_distances:
-        print('\t .. plotting for distances <= %.0fkm' % di)
-        plt.subplot(121)
-        axis['resolution'].where(axis['distance'] <= di).plot()
-        plt.title('Radial Resolution')
-
-        x = region['resolution'].where(region['distance'] <= di)
-        x = x.dropna('lat', how='all').dropna('lon', how='all')
-        ax = plt.subplot(122, projection=ccrs.PlateCarree())
-        plot_cartopy(x, ax=ax, title='Resolution map', **kwargs)
-
-        fig = plt.gcf()
-        fig.suptitle('Resolution (km). Distance closer than %.0fkm' % di)
-        if pdf is not None:
-            pdf.savefig(fig)
-        else:
-            plt.show()
-        plt.close()
-
-    if pdf is not None:
-        pdf.close()
-
-    return
-
-
-def set_plot_kwargs(da=None, list_darrays=None, **kwargs):
-    plot_kwargs = {k: v for k, v in kwargs.items()
-                   if k in ['cmap', 'title', 'vmin', 'vmax']}
-
-    if 'title' not in plot_kwargs:
-        plot_kwargs['title'] = '<NAME>: <VAR>'
-
-    if 'cmap' not in plot_kwargs:
-        plot_kwargs['cmap'] = 'Spectral'
-
-    vmin, vmax = None, None
-    if da is not None:
-        vmin = np.min(da)
-        vmax = np.max(da)
-    elif list_darrays is not None:
-        vmin = np.min([v.min() for v in list_darrays if v is not None])
-        vmax = np.max([v.max() for v in list_darrays if v is not None])
-
-    if 'vmin' not in plot_kwargs:
-        if vmin is not None:
-            plot_kwargs['vmin'] = vmin
-
-    if 'vmax' not in plot_kwargs:
-        if vmax is not None:
-            plot_kwargs['vmax'] = vmax
-    return plot_kwargs
-
-
-def view_mpas_regional_mesh(mpas_grid_file, outfile=None, **kwargs):
-
-    ds = open_mpas_regional_file(mpas_grid_file)
-
-    print(ds)
-
-    # PLOTS
-    plot_kwargs = set_plot_kwargs(da=ds['resolution'], **kwargs)
-    ax = plt.axes(projection=ccrs.PlateCarree())
-    axs = np.array([ax]).reshape([1, 1])
-
-    plot_mpas_darray(ds, 'resolution', ax=axs[0, 0], **plot_kwargs,
-                     name=os.path.basename(mpas_grid_file))
-
-    add_colorbar(axs, plt.gcf(), label='Resolution (km)',
-                 **plot_kwargs)
-
-    plot_expected_resolution_rings(ds, ax=axs[0, 0])
-
-    if outfile is not None:
-        plt.savefig(outfile)
-    else:
-        plt.show()
-    plt.close()
-
-    return ds
-
-
-def plot_expected_resolution_rings(ds, rings=None, outfile=None, ax=None):
-    final = False
-    if ax is None:
-        final = True
-        ax = plt.axes(projection=ccrs.PlateCarree())  # projection type
-        ax.add_feature(cfeature.BORDERS, linestyle=':')
-        ax.coastlines(resolution='10m')
-
-        gl = ax.gridlines(draw_labels=True, alpha=0.5, linestyle='--')
-        gl.top_labels = False
-        gl.right_labels = False
-
-    lat = ds.attrs['vtx-param-lat_ref']
-    lon = ds.attrs['vtx-param-lon_ref']
-
-    if rings is None:
-        rings = ['size', 'radius', 'border']
-
-    gd = Geodesic()
-    for ring in rings:
-        rad = ds.attrs['vtx-param-' + ring]
-        cp = gd.circle(lon=lon, lat=lat, radius=rad * 1000)
-        geom = shapely.geometry.Polygon(cp)
-        ax.add_geometries((geom,), crs=ccrs.PlateCarree(),
-                          facecolor='none', edgecolor='black',
-                          linewidth=1.5)
-
-    if final:
-        fig = plt.gcf()
-        fig.set_size_inches([10, 8])
-
-        if outfile is not None:
-            plt.savefig(outfile)
-
-        plt.show()
-        plt.close()
-
-    return
-
-
-def plot_mpas_darray(ds, vname, cmap='Spectral', ax=None, outfile=None,
-                     title='', **kwargs):
-
-    if vname not in ds.data_vars:
-        print('Unplottable Data Array ' + vname)
-        print(ds)
-        return
-
-    da = ds[vname]
-    for coord in ['time', 'lev']:
-        if coord in da.dims:
-            print('Selecting first slice for ' + coord + '.')
-            da = da.isel({coord: 0})
-
-    final = False
-    if ax is None:
-        final = True
-        ax = plt.axes(projection=ccrs.PlateCarree())  # projection type
-
-    if 'borders' not in kwargs:
-        lats = ds['latitude'].values.flatten()
-        lons = ds['longitude'].values.flatten()
-        borders = find_borders(lats, lons)
-    else:
-        borders = kwargs['borders']
-
-    ax.set_extent(borders, crs=ccrs.PlateCarree())
-
-    ax.add_feature(cfeature.BORDERS, linestyle=':')
-    ax.coastlines(resolution='10m')
-
-    gl = ax.gridlines(draw_labels=True, alpha=0.5, linestyle='--')
-    gl.top_labels = False
-    gl.right_labels = False
-
-    min_val = kwargs.get('vmin', da.min().values)
-    max_val = kwargs.get('vmax', da.max().values)
-
-    numvert = float(ds.dims['nVertices'])
-    last_val = float(ds['verticesOnCell'].sel(maxEdges=-1).values.mean())
-
-    if abs(last_val - numvert) < last_val / 2:
-        fillval = numvert
-    else:
-        fillval = 0.0
-
-    for i, cell in enumerate(da['nCells'].values):
-        value = da.sel(nCells=cell)
-
-        vals = ds['verticesOnCell'].sel(nCells=cell).values
-
-        vals = vals[vals != fillval] - 1
-
-        lats = ds['latitudeVertex'].sel(nVertices=vals)
-        lons = ds['longitudeVertex'].sel(nVertices=vals)
-
-        color = colorvalue(value, cmap=cmap, vmin=min_val,
-                           vmax=max_val)
-
-        ax.fill(lons, lats, edgecolor=None, linewidth=0.0,
-                facecolor=color)
-
-    units = da.attrs.get('units', '')
-    title = title.replace('<VAR>', vname).replace('<UNITS>', units)
-    name = kwargs.get('name', '')
-    ncells = str(len(da.values.flatten()))
-    title = title.replace('<NAME>', name).replace('<NCELLS>', ncells)
-    ax.set_title(title)
-
-    if final:
-        fig = plt.gcf()
-        fig.set_size_inches([10, 8])
-
-        cbar = fig.colorbar(  # get colorbar
-            mpl.cm.ScalarMappable(
-                norm=mpl.colors.Normalize(vmin=min_val, vmax=max_val,
-                                          clip=True),
-                cmap=cmap),
-            ax=ax)
-        cbar.ax.locator_params(nbins=10)
-        title_legend = '<VAR> (<UNITS>)'
-        title_legend = title_legend.replace('<VAR>',
-                                            vname).replace('<UNITS>', units)
-        cbar.set_label(title_legend)
-
-        if outfile is not None:
-            plt.savefig(outfile)
-
-        plt.show()
-        plt.close()
-
-    return
-
+def get_max_borders(list_results, margin='factor2', namelat='latitude',
+                    namelon='longitude'):
+    borders = np.array([find_borders(lats=ds[namelat].values,
+                                     lons=ds[namelon].values,
+                                     margin=margin)
+                        for ds in list_results])
+    max_borders = borders[:, 0].min(), borders[:, 1].max(), \
+                  borders[:, 2].min(), borders[:, 3].max()
+    return np.array(max_borders)

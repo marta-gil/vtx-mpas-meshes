@@ -1,9 +1,9 @@
 import argparse
 import os
-import xarray as xr
 
-from vtxmpasmeshes.plot_utilities import view_mpas_regional_mesh, \
-    plot_expected_resolution_rings
+from vtxmpasmeshes.dataset_utilities import open_mpas_regional_file
+from vtxmpasmeshes.plot_utilities import plot_mpas_darray
+from vtxmpasmeshes.mpas_plots import view_mpas_regional_mesh
 
 parser = argparse.ArgumentParser(
     description=__doc__,
