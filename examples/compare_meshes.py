@@ -28,4 +28,7 @@ for g in args.grids:
         raise IOError('File does not exist: ' + grid)
     grids.append(grid)
 
-compare_plot_mpas_regional_meshes(grids, outfile=args.outfile)
+compare_plot_mpas_regional_meshes(grids,
+                                  outfile=args.outfile,
+                                  suptitle='Meshes comparison',
+                                  each_title='<NAME>: <NCELLS> cells')

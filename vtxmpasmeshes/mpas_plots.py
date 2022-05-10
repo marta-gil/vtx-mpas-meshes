@@ -131,7 +131,7 @@ def compare_plot_mpas_regional_meshes(list_mesh_files, outfile=None,
     names = []
     datasets = {}
     for f in list_mesh_files:
-        name = os.path.basename(f)
+        name = os.path.basename(f).replace('.grid.nc', '')
         datasets[name] = open_mpas_regional_file(f)
         names.append(name)
 
@@ -143,20 +143,33 @@ def compare_plot_mpas_regional_meshes(list_mesh_files, outfile=None,
 
     nrows, ncols = get_plot_size(len(list_mesh_files))
 
-    fig, axs = plt.subplots(nrows=nrows, ncols=ncols,
-                            figsize=(3 + 5 * ncols, 5 * nrows))
-    axs = axs.reshape([nrows, ncols])
-    g = mpl.gridspec.GridSpec(nrows=nrows, ncols=ncols)
+    fig_size = [3 + 5 * ncols, 5 * nrows]
+    fig, axs = plt.subplots(nrows=nrows, ncols=ncols+1, figsize=fig_size)
+    axs = axs.reshape([nrows, ncols + 1])
+    g = mpl.gridspec.GridSpec(nrows=nrows, ncols=ncols+1)
 
     for m, name in enumerate(names):
         i, j = m // ncols, m % ncols
+
+        each_title = kwargs.get('each_title', '<NAME>')
+        ncells = str(datasets[name].dims['nCells'])
+        each_title = each_title.replace('<NAME>', name)
+        each_title = each_title.replace('<NCELLS>', ncells)
 
         axs[i, j] = plt.subplot(g[i, j], projection=ccrs.PlateCarree())
         add_cartopy_details(axs[i, j])
         plot_mpas_darray(datasets[name], 'resolution',
                          ax=axs[i, j], **plot_kwargs,
-                         title=name, borders=max_borders)
+                         title=each_title, borders=max_borders)
         plot_expected_resolution_rings(datasets[name], ax=axs[i, j])
 
-    add_colorbar(axs, label='Resolution (km)', **plot_kwargs)
-    close_plot(outfile=outfile)
+    for ax in axs[:, -1]:
+        ax.axis('off')
+
+    add_colorbar(axs[:, -1], label='Resolution (km)', **plot_kwargs)
+    suptitle = kwargs.get('suptitle', '')
+    if suptitle != '':
+        plt.gcf().suptitle(suptitle)
+        plt.subplots_adjust(top=0.9)
+    close_plot(outfile=outfile, size_fig=fig_size)
+

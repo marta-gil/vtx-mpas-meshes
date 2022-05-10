@@ -251,6 +251,8 @@ def add_colorbar(axs, fig=None, label=None, **plot_kwargs):
     if label is not None:
         cbar.set_label(label)
 
+    return
+
 
 def get_plot_size(numplots, nrows=None, ncols=None):
     if nrows is not None and ncols is not None:
