@@ -1,6 +1,14 @@
 # vtx-mpas-meshes
 Creation and analysis of MPAS-WRF meshes by Vortex
 
+
+Work under progress.
+Example of regional mesh:
+![example_mesh.png](example_mesh.png)
+
+Created by Marta Gil Bardají. 
+Contact email: marta.gil@vortexfdc.com
+
 ## Installation Guide
 
 To obtain a local copy of the code, clone this github repository [meshes]. Note that you need permission to do so.
@@ -36,6 +44,10 @@ and a successful message similar to this should appear:
 [meshes]: https://github.com/marta-gil/vtx-mpas-meshes.git
 
 ## Mesh generation
+
+Creates global and regional MPAS meshes based on global latlon resolution maps. The focus is on symmetric resolutions that are highest at a certain area of the planet and decrease radially.
+
+![example_resolution.png](example_resolution.png)
 
 Based on https://github.com/pedrospeixoto/MPAS-PXT/blob/master/grids/utilities/jigsaw/spherical_grid.py by Pedro S. Peixoto  ppeixoto@usp.br.
 
