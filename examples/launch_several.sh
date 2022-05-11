@@ -1,6 +1,6 @@
-for s in 010 020 030; do
-  for m in 050 100 150; do
-    name=dg1s${s}m${m}
+for s in 020 035 050; do
+  for m in 050 100 150 200; do
+    name=dg_s${s}m${m}
     echo " "
     echo " ----------------------------------------------------  "
     echo ${name}

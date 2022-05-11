@@ -3,6 +3,7 @@ import time
 
 import xarray as xr
 import numpy as np
+from scipy.interpolate import interp1d
 
 from mpas_tools.mesh.creation.jigsaw_to_netcdf import jigsaw_to_netcdf
 from mpas_tools.mesh.conversion import convert
@@ -17,76 +18,64 @@ from vtxmpasmeshes.dataset_utilities import distance_latlon_matrix, \
 PATH_LIMITED_AREA = '/home/marta/PycharmProjects/MPAS-Limited-Area'
 
 
-def doughnut_variable_resolution(distances, highresolution,
-                                 lowresolution, size, margin, **kwargs):
+def apply_resolution_at_distance(distances, ref_points, ref_resolutions):
+    f = interp1d(ref_points, ref_resolutions, bounds_error=False,
+                 fill_value='extrapolate')
+    resolution = xr.apply_ufunc(f, distances)
+    return resolution
 
-    # initialize with a very low resolution
-    final_res_dist = 1000
-    resolution = final_res_dist * np.ones(distances.shape)
+
+def doughnut_variable_resolution(**kwargs):
+
+    # Setting parameters to the defaults if not passed as arguments
+    defaults = {'lowresolution': 3,
+                'highresolution': 25,
+                'size': 40,
+                'margin': 100,
+                'final_res_dist': 1000}
+
+    for name, default in defaults.items():
+        kwag = kwargs.get(name, None)
+        if kwag is None:
+            kwargs.update({name: default})
 
     # Inner Circle
     # ------------------------------
-    # inner circle of radius <size>km and resolution <highresolution>km
-    # ie, where distances_array < size set resolution = highresolution
-    central_zone = distances <= size
-    resolution = np.where(central_zone, highresolution, resolution)
+    # From distance 0 to <size> -> constant highresolution
+    d0, r0 = 0., kwargs['highresolution']
+    d1, r1 = kwargs['size'], kwargs['highresolution']
 
     # 1st Variable Resolution Ring
     # -------------------------------
-    # Starts at the edge of the inner circle and lasts for <margin>km,
-    # so it ends at a distance radius = <size>+<margin> km
-    # The resolution in this area transitions linearly from
-    # <highresolution> to <lowresolution>.
-
-    # distance where the 1st variable resolution ring finishes
-    radius = size + margin
-    # slope at the 1st variable resolution ring
-    slope = (lowresolution - highresolution) / margin
-
-    transition_zone = (distances > size) & (distances <= radius)
-    distance_to_innercircle = distances - size
-    transition_vals = highresolution + slope * distance_to_innercircle
-    resolution = np.where(transition_zone, transition_vals, resolution)
+    # From <size> to <radius> = <size>+<margin> -> linear increase
+    # from highresolution to lowresolution
+    kwargs['radius'] = kwargs['size'] + kwargs['margin']
+    slope = (kwargs['lowresolution'] - kwargs['highresolution']) / kwargs['margin']
+    d2, r2 = kwargs['radius'], kwargs['lowresolution']
 
     # Fixed Low Resolution ring
     # -------------------------------
-    # Starts at the edge of the 1st variable resolution ring (<radius>)
-    # circle and lasts for "10 rings of cells", which we can approximate
-    # to buffer=10*<lowresolution>km, so it ends at a distance
-    # border = <radius>+<buffer> km
-    # The resolution in this area is constant: <lowresolution> km
-
-    # width of the low resolution ring
-    buffer = 10*lowresolution
-    # distance where the low resolution ring finishes
-    border = radius + buffer
-
-    lowres_zone = (distances > radius) & (distances <= border)
-    resolution = np.where(lowres_zone, lowresolution, resolution)
+    # From <radius> until <border>=<radius>+<buffer> -> constant lowresolution
+    #  - where the <buffer>=10 * lowresolution
+    kwargs['buffer'] = 10 * kwargs['lowresolution']
+    kwargs['border'] = kwargs['radius'] + kwargs['buffer']
+    d3, r3 = kwargs['border'], kwargs['lowresolution']
 
     # Crazy increase in cell size ring
-    # -------------------------------
-    # Further than the <border> of the low resolution area we
-    # keep increasing the resolution (using the same <slope>) as
-    # before. This is just done to avoid having a very big global mesh.
-    # The regional mesh generated after cutting this global mesh
-    # will not include this part.
-    # We stop this ring when the variable resolution reaches the
-    # maximum width cell final_res_dist (which is the value we
-    # initialized the resolution array with).
+    # --------------------------------
+    # From <border> to <xmax> -> linear increase with the same <slope>
+    # than before until we reach the reoslution <final_res_dist>
+    #  - <xmax> can be computed
+    deltares = kwargs['final_res_dist'] - kwargs['lowresolution']
+    xmax = kwargs['border'] + deltares / slope
+    d4, r4 = xmax, kwargs['final_res_dist']
+    d5, r5 = 2*xmax, kwargs['final_res_dist']
 
-    distance_to_lowring= distances - border
-    second_transition_vals = lowresolution + slope * distance_to_lowring
+    # Those are the points I fix
+    dists = np.array([d0, d1, d2, d3, d4, d5])
+    resol = np.array([r0, r1, r2, r3, r4, r5])
 
-    second_transition_zone = (distances > border) & \
-                             (second_transition_vals < final_res_dist)
-
-    resolution = np.where(second_transition_zone,
-                          second_transition_vals, resolution)
-
-    # Finished!
-
-    return resolution
+    return dists, resol, kwargs
 
 
 def variable_resolution_latlonmap(grid, **kwargs):
@@ -135,27 +124,9 @@ def variable_resolution_latlonmap(grid, **kwargs):
     print('\tComputing resolutions using technique %s' % grid)
 
     if grid == 'doughnut':
-
-        # Setting parameters to the defaults if not passed as arguments
-        defaults = {'lowresolution': 3,
-                    'highresolution': 25,
-                    'size': 40,
-                    'margin': 20}
-
-        for name, default in defaults.items():
-            kwag = kwargs.get(name, None)
-            if kwag is None:
-                kwargs.update({name: default})
-
-        kwargs['radius'] = kwargs['size'] + kwargs['margin']
-        kwargs['buffer'] = 10*kwargs['lowresolution']
-        kwargs['border'] = kwargs['radius'] + kwargs['buffer']
-
-        print('\t' + repr(kwargs))
-        res = doughnut_variable_resolution(ds['distance'].values,
-                                           **kwargs)
-        ds['resolution'] = xr.DataArray(data=res, dims=('lat', 'lon'))
-
+        dists, resol, kwargs = doughnut_variable_resolution(**kwargs)
+        ds['resolution'] = apply_resolution_at_distance(
+            ds['distance'], ref_points=dists, ref_resolutions=resol)
     else:
         raise ValueError('!! Grid %s not implemented.' % grid)
 
@@ -309,6 +280,7 @@ def full_generation_process(mpas_grid_file, grid, redo=True,
     for name, value in resolution_ds.attrs.items():
         mpas_ds.attrs['vtx-param-' + str(name)] = value
 
+    # Update the duration of the steps
     durations_process = {
         'resolution': duration_resolution,
         'generation': duration_gen,
@@ -318,6 +290,8 @@ def full_generation_process(mpas_grid_file, grid, redo=True,
     for name, value in durations_process.items():
         mpas_ds.attrs['vtx-duration-' + name] = '%.2f' % value
 
+    print('\n MESH:\n')
+    print(mpas_ds)
     mpas_ds.to_netcdf(mpas_grid_file)
 
     if not os.path.isfile(mpas_grid_file):
@@ -327,6 +301,7 @@ def full_generation_process(mpas_grid_file, grid, redo=True,
     os.system('rm -f ' + mpas_grid_file_tmp)
 
     if do_plots:
+        print('Resolution Plots')
         view_mpas_regional_mesh(mpas_grid_file,
                                 outfile=path_save + '/resolution_mesh.png')
 

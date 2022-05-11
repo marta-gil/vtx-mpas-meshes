@@ -49,12 +49,12 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "-clat", "--clat", default=0., type=float,
+    "-lat", "--lat_ref", default=0., type=float,
     help="Central latitude.",
 )
 
 parser.add_argument(
-    "-clon", "--clon", default=0., type=float,
+    "-lon", "--lon_ref", default=0., type=float,
     help="Central longitude.",
 )
 
@@ -76,8 +76,8 @@ ds = variable_resolution_latlonmap(args.grid,
                                    lowresolution=args.lowresolution,
                                    size=args.size,
                                    margin=args.margin,
-                                   lat_ref=args.clat,
-                                   lon_ref=args.clon,
+                                   lat_ref=args.lat_ref,
+                                   lon_ref=args.lon_ref,
                                    )
 
 print(ds)

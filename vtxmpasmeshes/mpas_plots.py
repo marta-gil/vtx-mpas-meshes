@@ -1,4 +1,6 @@
 import os
+
+import numpy as np
 from shapely.geometry import Polygon
 
 import matplotlib as mpl
@@ -8,9 +10,11 @@ from cartopy.geodesic import Geodesic
 from matplotlib.backends.backend_pdf import PdfPages
 
 from vtxmpasmeshes.dataset_utilities import open_mpas_regional_file
-from vtxmpasmeshes.plot_utilities import plot_latlon_cartopy, plot_mpas_darray, \
-    set_plot_kwargs, add_colorbar, start_cartopy_map_axis, close_plot, \
-    add_cartopy_details, get_plot_size, get_max_borders, find_borders
+
+from vtxmpasmeshes.plot_utilities import plot_latlon_cartopy, \
+    plot_mpas_darray, set_plot_kwargs, add_colorbar, \
+    start_cartopy_map_axis, close_plot, add_cartopy_details, \
+    get_plot_size, get_max_borders, get_borders_at_distance
 
 
 def view_resolution_map(ds, pdfname=None, list_distances=None):
@@ -95,7 +99,7 @@ def plot_expected_resolution_rings(ds, rings=None, outfile=None, ax=None):
         geom = Polygon(cp)
         ax.add_geometries((geom,), crs=ccrs.PlateCarree(),
                           facecolor='none', edgecolor='black',
-                          linewidth=1.5)
+                          linewidth=1.5, alpha=0.8)
 
     # close if needed
     if final:
@@ -103,7 +107,27 @@ def plot_expected_resolution_rings(ds, rings=None, outfile=None, ax=None):
     return
 
 
-def view_mpas_regional_mesh(mpas_grid_file, outfile=None, **kwargs):
+def plot_era5_grid(ax):
+    gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                      linewidth=1, color='gray', alpha=0.6, linestyle='-')
+
+    gl.top_labels = False
+    gl.left_labels = False
+    gl.bottom_labels = False
+    gl.right_labels = False
+
+    era5_lons = np.arange(-180, 180, 0.25)
+    era5_lats = np.arange(-90, 90, 0.25)
+    gl.xlocator = mpl.ticker.FixedLocator(era5_lons)
+    gl.ylocator = mpl.ticker.FixedLocator(era5_lats)
+    gl.xlabel_style = {'size': 15, 'color': 'gray'}
+    gl.xlabel_style = {'color': 'red', 'weight': 'bold'}
+
+
+def view_mpas_regional_mesh(mpas_grid_file, outfile=None,
+                            do_plot_resolution_rings=True,
+                            do_plot_era5_grid=False,
+                            **kwargs):
 
     ds = open_mpas_regional_file(mpas_grid_file)
 
@@ -116,7 +140,10 @@ def view_mpas_regional_mesh(mpas_grid_file, outfile=None, **kwargs):
     plot_mpas_darray(ds, 'resolution', ax=ax, **plot_kwargs,
                      title='Resolution of the mesh <NAME>',
                      name=os.path.basename(mpas_grid_file))
-    plot_expected_resolution_rings(ds, ax=ax)
+    if do_plot_era5_grid:
+        plot_era5_grid(ax)
+    if do_plot_resolution_rings:
+        plot_expected_resolution_rings(ds, ax=ax)
     # --------
 
     add_colorbar(ax, label='Resolution (km)', **plot_kwargs)
@@ -126,6 +153,9 @@ def view_mpas_regional_mesh(mpas_grid_file, outfile=None, **kwargs):
 
 
 def compare_plot_mpas_regional_meshes(list_mesh_files, outfile=None,
+                                      border_radius=None,
+                                      do_plot_resolution_rings=True,
+                                      do_plot_era5_grid=True,
                                       **kwargs):
 
     names = []
@@ -138,12 +168,34 @@ def compare_plot_mpas_regional_meshes(list_mesh_files, outfile=None,
     vars_list = [ds['resolution'] for ds in datasets.values()]
     plot_kwargs = set_plot_kwargs(list_darrays=vars_list, **kwargs)
 
-    max_borders = get_max_borders(datasets.values(), namelat='latitude',
-                                  namelon='longitude')
+    if border_radius is None:
+        max_borders = get_max_borders(datasets.values(),
+                                      namelat='latitude',
+                                      namelon='longitude')
+    else:
+        # Find the center
+        # 1. try the kwargs
+        central_lat = kwargs.get('lat_ref', None)
+        central_lon = kwargs.get('lon_ref', None)
+
+        for ds in datasets.values():
+            if central_lat is not None and central_lon is not None:
+                break
+            central_lat = ds.attrs.get('vtx-param-lat_ref', None)
+            central_lon = ds.attrs.get('vtx-param-lon_ref', None)
+        if central_lon is None or central_lat is None:
+            max_borders = get_max_borders(datasets.values(),
+                                          namelat='latitude',
+                                          namelon='longitude')
+        else:
+            max_borders = get_borders_at_distance(border_radius,
+                                                  centerlat=central_lat,
+                                                  centerlon=central_lon,
+                                                  )
 
     nrows, ncols = get_plot_size(len(list_mesh_files))
 
-    fig_size = [3 + 5 * ncols, 5 * nrows]
+    fig_size = [5 * ncols, 5 * nrows]
     fig, axs = plt.subplots(nrows=nrows, ncols=ncols+1, figsize=fig_size)
     axs = axs.reshape([nrows, ncols + 1])
     g = mpl.gridspec.GridSpec(nrows=nrows, ncols=ncols+1)
@@ -161,7 +213,10 @@ def compare_plot_mpas_regional_meshes(list_mesh_files, outfile=None,
         plot_mpas_darray(datasets[name], 'resolution',
                          ax=axs[i, j], **plot_kwargs,
                          title=each_title, borders=max_borders)
-        plot_expected_resolution_rings(datasets[name], ax=axs[i, j])
+        if do_plot_era5_grid:
+            plot_era5_grid(axs[i, j])
+        if do_plot_resolution_rings:
+            plot_expected_resolution_rings(datasets[name], ax=axs[i, j])
 
     for ax in axs[:, -1]:
         ax.axis('off')
@@ -169,7 +224,7 @@ def compare_plot_mpas_regional_meshes(list_mesh_files, outfile=None,
     add_colorbar(axs[:, -1], label='Resolution (km)', **plot_kwargs)
     suptitle = kwargs.get('suptitle', '')
     if suptitle != '':
-        plt.gcf().suptitle(suptitle)
+        plt.gcf().suptitle(suptitle, fontsize=16)
         plt.subplots_adjust(top=0.9)
     close_plot(outfile=outfile, size_fig=fig_size)
 

@@ -5,6 +5,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+from geopy.distance import distance
 
 
 # OPEN AND CLOSE PLOTS
@@ -51,26 +52,31 @@ def close_plot(fig=None, size_fig=None, pdf=None, outfile=None,
 
 def set_plot_kwargs(da=None, list_darrays=None, **kwargs):
     plot_kwargs = {k: v for k, v in kwargs.items()
-                   if k in ['cmap', 'vmin', 'vmax']}
+                   if k in ['cmap', 'vmin', 'vmax']
+                   and v is not None}
 
     if 'cmap' not in plot_kwargs:
         plot_kwargs['cmap'] = 'Spectral'
 
-    vmin, vmax = None, None
-    if da is not None:
-        vmin = np.min(da)
-        vmax = np.max(da)
-    elif list_darrays is not None:
-        vmin = np.min([v.min() for v in list_darrays if v is not None])
-        vmax = np.max([v.max() for v in list_darrays if v is not None])
+    vmin = plot_kwargs.get('vmin', None)
+    if vmin is None:
+        if da is not None:
+            vmin = np.min(da)
+        elif list_darrays is not None:
+            vmin = np.min([v.min() for v in list_darrays if v is not None])
+    if vmin is not None:
+        plot_kwargs['vmin'] = vmin
 
-    if 'vmin' not in plot_kwargs:
-        if vmin is not None:
-            plot_kwargs['vmin'] = vmin
+    vmax = plot_kwargs.get('vmax', None)
+    if vmax is None:
+        if da is not None:
+            vmax = np.max(da)
+        elif list_darrays is not None:
+            vmax = np.max([v.max() for v in list_darrays if v is not None])
 
-    if 'vmax' not in plot_kwargs:
-        if vmax is not None:
-            plot_kwargs['vmax'] = vmax
+    if vmax is not None:
+        plot_kwargs['vmax'] = vmax
+
     return plot_kwargs
 
 
@@ -101,6 +107,21 @@ def find_borders(lats, lons, margin='factor2'):
         limits = minlon, maxlon, minlat, maxlat
 
     return limits
+
+
+def get_borders_at_distance(distance_km, centerlat=0., centerlon=0.):
+    len_grid = distance(kilometers=distance_km)
+
+    maxlat = len_grid.destination(point=(centerlat, centerlon),
+                                  bearing=0).latitude
+    minlat = len_grid.destination(point=(centerlat, centerlon),
+                                  bearing=180).latitude
+    maxlon = len_grid.destination(point=(centerlat, centerlon),
+                                  bearing=90).longitude
+    minlon = len_grid.destination(point=(centerlat, centerlon),
+                                  bearing=270).longitude
+
+    return minlon, maxlon, minlat, maxlat
 
 
 # BASIC LATLON PLOT

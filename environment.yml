@@ -32,6 +32,7 @@ dependencies:
   - pandas
   - geopy
   - scikit-learn
+  - setuptools
   - conda-forge::jigsaw[version='>=0.9.12']
   - conda-forge::jigsawpy[version='>=0.2.1']
   - conda-forge::mpas_tools
