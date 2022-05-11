@@ -1,11 +1,17 @@
 # vtx-mpas-meshes
 Creation and analysis of MPAS-WRF meshes by Vortex
 
-## Environment
+## Installation Guide
+
+To obtain a local copy of the code, clone this github repository [meshes]. Note that you need permission to do so.
+
+    $ git clone git@github.com:marta-gil/vtx-mpas-meshes.git
+
+The necessary conda environment can be created using the ``environment.yml`` file present in the **vtx-mpas-meshes** repository cloned from github:
 
     $ conda env create -n <envname> -f <path-to-environment.yml-file>
 
-It contains:
+The conda environment contains:
 * mpas-tools & jigsaw for mesh creation
 * xarray, geopy, cartopy for mesh visualization
 * packages for documentation
@@ -19,6 +25,15 @@ Then you can install the scripts of this repository by installing the `vtxmpasme
 
     (<envname>) $ pyhton setup.py install
 
+To be able to run the Jupyter Notebooks, add the environment to ipykernel:
+
+    (<envname>) $ python -m ipykernel install --user --name=<envname>
+
+and a successful message similar to this should appear:
+
+    Installed kernelspec <envname> in /home/<username>/.local/share/jupyter/kernels/<envname>
+
+[meshes]: https://github.com/marta-gil/vtx-mpas-meshes.git
 
 ## Mesh generation
 

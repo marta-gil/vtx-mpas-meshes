@@ -18,10 +18,10 @@ def start_cartopy_map_axis(zorder=1):
 
 def add_cartopy_details(ax, zorder=1):
     ax.add_feature(cfeature.BORDERS, linestyle=':', zorder=zorder)
-    ax.coastlines(resolution='10m', zorder=zorder)
+    ax.coastlines(resolution='10m', zorder=zorder+1)
 
     gl = ax.gridlines(draw_labels=True, alpha=0.5, linestyle='--',
-                      zorder=zorder)
+                      zorder=zorder+2)
     gl.top_labels = False
     gl.right_labels = False
 
@@ -139,8 +139,10 @@ def plot_latlon_cartopy(darray, ax=None, title='', borders=None, **kwargs):
         # borders = [minlon, maxlon, minlat, maxlat]
     ax.set_extent(borders, crs=ccrs.PlateCarree())
 
+    kwargs = set_plot_kwargs(da=darray, extend='both', **kwargs)
+
     # Plot the array (automatic xarray plot)
-    darray.plot(ax=ax, **kwargs)  # plot the resolution
+    darray.plot(ax=ax, zorder=1, **kwargs)  # plot the resolution
 
     ax.set_title(title)
     return

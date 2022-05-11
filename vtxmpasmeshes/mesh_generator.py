@@ -28,8 +28,8 @@ def apply_resolution_at_distance(distances, ref_points, ref_resolutions):
 def doughnut_variable_resolution(**kwargs):
 
     # Setting parameters to the defaults if not passed as arguments
-    defaults = {'lowresolution': 3,
-                'highresolution': 25,
+    defaults = {'lowresolution': 25,
+                'highresolution': 3,
                 'size': 40,
                 'margin': 100,
                 'final_res_dist': 1000}

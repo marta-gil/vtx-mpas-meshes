@@ -17,11 +17,9 @@ from vtxmpasmeshes.plot_utilities import plot_latlon_cartopy, \
     get_plot_size, get_max_borders, get_borders_at_distance
 
 
-def view_resolution_map(ds, pdfname=None, list_distances=None):
+def view_resolution_map(ds, pdfname=None, list_distances=None, **kwargs):
     # ds is a resolution dataset ('distance' and 'resolution' dataset)
     # we plot, for different distances, a
-
-    kwargs = {'cmap': 'Spectral', 'vmin': 0, 'levels': 41}
 
     if list_distances is None:
         list_distances = [1000, 500, 200, 50]
