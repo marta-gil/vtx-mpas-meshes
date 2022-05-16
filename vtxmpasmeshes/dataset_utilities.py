@@ -30,7 +30,7 @@ def distance_latlon_matrix(lat, lon, lat_ref=0., lon_ref=0., do_tile=False):
     return km
 
 
-def add_mpas_mesh_variables(ds):
+def add_mpas_mesh_variables(ds, full=True):
     for v in ds.data_vars:
         if v not in derived_variables:
             continue
@@ -73,6 +73,11 @@ def add_mpas_mesh_variables(ds):
                 ds[newv] = 2 * (xr.apply_ufunc(np.sqrt, area / math.pi))
                 ds[newv].attrs['units'] = 'km'
                 ds[newv].attrs['long_name'] = 'Resolution of the cell (approx)'
+
+    if full:
+        ds = add_distance_to_reference(ds)
+        ds = compute_metrics_edge_lengths(ds)
+
     return ds
 
 
@@ -114,8 +119,109 @@ def get_distance_to_center(lats, lons,
     return d
 
 
-def open_mpas_regional_file(file):
+def compute_metrics_edge_lengths(ds):
+    distances = []
+
+    for i, cell in enumerate(ds['nCells'].values):
+        vals = ds['verticesOnCell'].sel(nCells=cell).values
+
+        num_sides = int(ds['nEdgesOnCell'].sel(nCells=cell))
+        vals = vals[:num_sides] - 1
+        lats = ds['latitudeVertex'].values[vals]
+        lons = ds['longitudeVertex'].values[vals]
+        lat_ref = lats[-1]
+        lon_ref = lons[-1]
+
+        my_cell_dists = []
+        for i in range(ds.dims['maxEdges']):
+            if i >= num_sides:
+                my_cell_dists.append(np.nan)
+                continue
+            d = distance_latlon_matrix(lats[i], lons[i],
+                                       lat_ref=lat_ref,
+                                       lon_ref=lon_ref, do_tile=False)
+
+            my_cell_dists.append(d)
+            lat_ref, lon_ref = lats[i], lons[i]
+        distances.append(my_cell_dists)
+
+    ds['edgesLength'] = xr.DataArray(data=distances,
+                                     dims=('nCells', 'maxEdges'))
+    ds['edgesLength'].attrs = {
+        'name': 'Length of edges',
+        'units': 'km',
+        'long_name': 'Haversine distance between adjacent vertices of a cell.'
+    }
+
+    ds['mean_edgesLength'] = ds['edgesLength'].mean(dim='maxEdges')
+    ds['mean_edgesLength'].attrs = {
+        'name': 'Mean edge length',
+        'units': 'km',
+        'long_name': 'Mean edge length of a cell.'
+    }
+
+    ds['min_edgesLength'] = ds['edgesLength'].min(dim='maxEdges')
+    ds['min_edgesLength'].attrs = {
+        'name': 'Minimum edge length',
+        'units': 'km',
+        'long_name': 'Minimum edge length of a cell.'
+    }
+
+    ds['max_edgesLength'] = ds['edgesLength'].max(dim='maxEdges')
+    ds['max_edgesLength'].attrs = {
+        'name': 'Maximum edge',
+        'units': 'km',
+        'long_name': 'Maximum edge length of a cell.'
+    }
+
+    ds['rmse_edgesLength'] = xr.apply_ufunc(np.sqrt,
+                                            (ds['edgesLength'] ** 2).mean(
+                                                dim='maxEdges'))
+    ds['rmse_edgesLength'].attrs = {
+        'name': 'Rmse edge length',
+        'units': 'km',
+        'long_name': 'Root mean squared edge length.'
+    }
+
+    ds['ration_edgesLength'] = ds['min_edgesLength'] / ds['max_edgesLength']
+    ds['ration_edgesLength'].attrs = {
+        'name': 'Ratio of edge lengths',
+        'units': '',
+        'long_name': 'Ratio between minimum and maximum edge lengths '
+                     'of a cell.'
+    }
+
+    ds['cellDistortion'] = xr.apply_ufunc(np.sqrt, (
+                (ds['edgesLength'] - ds['rmse_edgesLength']) ** 2).mean(
+        dim='maxEdges')) / ds['rmse_edgesLength']
+    ds['cellDistortion'].attrs = {
+        'name': 'Cell Distortion',
+        'units': '',
+        'long_name': 'Cell Distortion: Haversine distance between adjacent '
+                     'vertices of a cell. '
+                     'https://pedrosp.ime.usp.br/papers/PeixotoBarros2013.pdf'
+    }
+    return ds
+
+
+def add_distance_to_reference(ds, **kwargs):
+    lat_ref = kwargs.get('lat_ref', ds.attrs['vtx-param-lat_ref'])
+    lon_ref = kwargs.get('lon_ref', ds.attrs['vtx-param-lon_ref'])
+
+    d = get_distance_to_center(ds['latitude'].values, ds['longitude'].values,
+                               center_lat=lat_ref, center_lon=lon_ref)
+
+    ds['cellDistance'] = xr.DataArray(data=d, dims=('nCells'))
+    ds['cellDistance'].attrs = {
+        'name': 'Distance to ref. point',
+        'units': 'km',
+        'long_name': 'Distance from cell center to reference point'
+    }
+    return ds
+
+
+def open_mpas_regional_file(file, **kwargs):
     ds = xr.open_dataset(file)
-    ds = add_mpas_mesh_variables(ds)
+    ds = add_mpas_mesh_variables(ds, **kwargs)
     return ds
 

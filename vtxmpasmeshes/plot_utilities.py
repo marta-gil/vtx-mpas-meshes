@@ -206,21 +206,12 @@ def plot_mpas_darray(ds, vname, ax=None, outfile=None, **kwargs):
 
     plot_kwargs = set_plot_kwargs(da=da, **kwargs)
 
-    numvert = float(ds.dims['nVertices'])
-    last_val = float(ds['verticesOnCell'].sel(maxEdges=-1).values.mean())
-
-    if abs(last_val - numvert) < last_val / 2:
-        fillval = numvert
-    else:
-        fillval = 0.0
-
     for i, cell in enumerate(da['nCells'].values):
         value = da.sel(nCells=cell)
 
         vals = ds['verticesOnCell'].sel(nCells=cell).values
-
-        vals = vals[vals != fillval] - 1
-
+        num_sides = int(ds['nEdgesOnCell'].sel(nCells=cell))
+        vals = vals[:num_sides] - 1
         lats = ds['latitudeVertex'].sel(nVertices=vals)
         lons = ds['longitudeVertex'].sel(nVertices=vals)
 

@@ -125,26 +125,35 @@ def plot_era5_grid(ax):
 def view_mpas_regional_mesh(mpas_grid_file, outfile=None,
                             do_plot_resolution_rings=True,
                             do_plot_era5_grid=False,
+                            vname='resolution',
                             **kwargs):
 
-    ds = open_mpas_regional_file(mpas_grid_file)
+    if vname != 'resolution':
+        full = True
+    else:
+        full = False
+
+    ds = open_mpas_regional_file(mpas_grid_file, full=full)
+
+    units = ds[vname].attrs.get('units', '')
+    ncells = str(len(ds[vname].values.flatten()))
+    name = os.path.basename(mpas_grid_file)
 
     # PLOT RESOLUTION
 
     ax = start_cartopy_map_axis(zorder=2)
-    plot_kwargs = set_plot_kwargs(da=ds['resolution'], **kwargs)
+    plot_kwargs = set_plot_kwargs(da=ds[vname], **kwargs)
 
     # --------
-    plot_mpas_darray(ds, 'resolution', ax=ax, **plot_kwargs,
-                     title='Resolution of the mesh <NAME>',
-                     name=os.path.basename(mpas_grid_file))
+    plot_mpas_darray(ds, vname, ax=ax, **plot_kwargs,
+                     title=vname + ': ' + name + ' (' + str(ncells) + ')')
     if do_plot_era5_grid:
         plot_era5_grid(ax)
     if do_plot_resolution_rings:
         plot_expected_resolution_rings(ds, ax=ax)
     # --------
 
-    add_colorbar(ax, label='Resolution (km)', **plot_kwargs)
+    add_colorbar(ax, label=vname + ' (' + units + ')', **plot_kwargs)
     close_plot(outfile=outfile)
 
     return ds
@@ -152,18 +161,24 @@ def view_mpas_regional_mesh(mpas_grid_file, outfile=None,
 
 def compare_plot_mpas_regional_meshes(list_mesh_files, outfile=None,
                                       border_radius=None,
+                                      vname='resolution',
                                       do_plot_resolution_rings=True,
                                       do_plot_era5_grid=True,
                                       **kwargs):
+
+    if vname != 'resolution':
+        full = True
+    else:
+        full = False
 
     names = []
     datasets = {}
     for f in list_mesh_files:
         name = os.path.basename(f).replace('.grid.nc', '')
-        datasets[name] = open_mpas_regional_file(f)
+        datasets[name] = open_mpas_regional_file(f, full=full)
         names.append(name)
 
-    vars_list = [ds['resolution'] for ds in datasets.values()]
+    vars_list = [ds[vname] for ds in datasets.values()]
     plot_kwargs = set_plot_kwargs(list_darrays=vars_list, **kwargs)
 
     if border_radius is None:
@@ -208,7 +223,7 @@ def compare_plot_mpas_regional_meshes(list_mesh_files, outfile=None,
 
         axs[i, j] = plt.subplot(g[i, j], projection=ccrs.PlateCarree())
         add_cartopy_details(axs[i, j])
-        plot_mpas_darray(datasets[name], 'resolution',
+        plot_mpas_darray(datasets[name], vname,
                          ax=axs[i, j], **plot_kwargs,
                          title=each_title, borders=max_borders)
         if do_plot_era5_grid:
@@ -219,7 +234,7 @@ def compare_plot_mpas_regional_meshes(list_mesh_files, outfile=None,
     for ax in axs[:, -1]:
         ax.axis('off')
 
-    add_colorbar(axs[:, -1], label='Resolution (km)', **plot_kwargs)
+    add_colorbar(axs[:, -1], label=vname + ' (km)', **plot_kwargs)
     suptitle = kwargs.get('suptitle', '')
     if suptitle != '':
         plt.gcf().suptitle(suptitle, fontsize=16)
