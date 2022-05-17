@@ -77,6 +77,7 @@ def add_mpas_mesh_variables(ds, full=True):
     if full:
         ds = add_distance_to_reference(ds)
         ds = compute_metrics_edge_lengths(ds)
+        ds = compute_metrics_triangle_quality(ds)
 
     return ds
 
@@ -204,6 +205,38 @@ def compute_metrics_edge_lengths(ds):
     return ds
 
 
+def compute_metrics_triangle_quality(ds):
+    distances = []
+
+    for i, vertex in enumerate(ds['nVertices'].values):
+        vals = ds['cellsOnVertex'].sel(nVertices=vertex).values
+
+        lats = ds['latitude'].values[vals]
+        lons = ds['longitude'].values[vals]
+        lat_ref = lats[-1]
+        lon_ref = lons[-1]
+
+        my_cell_dists = []
+        for i in range(3):
+            d = distance_latlon_matrix(lats[i], lons[i],
+                                       lat_ref=lat_ref,
+                                       lon_ref=lon_ref, do_tile=False)
+
+            my_cell_dists.append(d)
+            lat_ref, lon_ref = lats[i], lons[i]
+        distances.append(my_cell_dists)
+
+    ds['t_edgesLength'] = xr.DataArray(data=distances,
+                                       dims=('nVertices', 3))
+    ds['t_edgesLength'].attrs = {
+        'name': 'Length of edges for a triangle',
+        'units': 'km',
+        'long_name': 'Haversine distance between adjacent center '
+                     'cells of a vertex.'
+    }
+    return ds
+
+
 def add_distance_to_reference(ds, **kwargs):
     lat_ref = kwargs.get('lat_ref', ds.attrs['vtx-param-lat_ref'])
     lon_ref = kwargs.get('lon_ref', ds.attrs['vtx-param-lon_ref'])
@@ -225,3 +258,135 @@ def open_mpas_regional_file(file, **kwargs):
     ds = add_mpas_mesh_variables(ds, **kwargs)
     return ds
 
+
+def compute_metrics_triangle_quality(ds):
+    distances = []
+    circ_radius = []
+    area_triangles = []
+    for vertex in ds['nVertices']:
+        vals = ds['cellsOnVertex'].sel(nVertices=vertex).values
+
+        if 0 in vals:
+            distances.append([np.nan, np.nan, np.nan])
+            circ_radius.append(np.nan)
+            area_triangles.append(np.nan)
+            continue
+
+        vals = vals - 1
+        lats = ds['latitude'].sel(nCells=vals).values
+        lons = ds['longitude'].sel(nCells=vals).values
+
+        lat_ref = lats[-1]
+        lon_ref = lons[-1]
+
+        dis = []
+        for i in range(3):
+            d = distance_latlon_matrix(lats[i], lons[i],
+                                       lat_ref=lat_ref,
+                                       lon_ref=lon_ref, do_tile=False)
+            dis.append(d)
+            lat_ref, lon_ref = lats[i], lons[i]
+
+        # abc / np.sqrt( ( a + b + c ) ( b + c − a ) ( c + a − b ) ( a + b − c ) )
+        radius_ball = dis[0] * dis[1] * dis[2] / np.sqrt(
+            (dis[0] + dis[1] + dis[2]) * (-dis[0] + dis[1] + dis[2]) * (
+                        dis[0] - dis[1] + dis[2]) * (dis[0] + dis[1] - dis[2]))
+        circ_radius.append(radius_ball)
+
+        # sqrt(p ( p − a ) ( p − b ) ( p − c )) where p is half-perimeter
+        p = (dis[0] + dis[1] + dis[2]) / 2
+        area = np.sqrt(p * (p - dis[0]) * (p - dis[1]) * (p - dis[2]))
+        area_triangles.append(area)
+
+        distances.append(dis)
+
+    ds['tsideLength'] = xr.DataArray(data=distances,
+                                     dims=('nVertices', 'vertexDegree'))
+    ds['tsideLength'].attrs = {
+        'name': 'Length of sides for a triangle',
+        'units': 'km',
+        'long_name': 'Haversine distance between adjacent vertices of triangles (center '
+                     'cells that surround a vertex).'
+    }
+
+    ds['mean_tsideLength'] = ds['tsideLength'].mean(dim='vertexDegree')
+    ds['edgesLength'].attrs = {
+        'name': 'Mean side length',
+        'units': 'km',
+        'long_name': 'Mean side length of a triangle.'
+    }
+
+    ds['min_tsideLength'] = ds['tsideLength'].min(dim='vertexDegree')
+    ds['min_tsideLength'].attrs = {
+        'name': 'Minimum side length',
+        'units': 'km',
+        'long_name': 'Minimum side length of a triangle.'
+    }
+
+    ds['max_tsideLength'] = ds['tsideLength'].max(dim='vertexDegree')
+    ds['max_tsideLength'].attrs = {
+        'name': 'Maximum side length',
+        'units': 'km',
+        'long_name': 'Maximum side length of a triangle.'
+    }
+
+    ds['rmse_tsideLength'] = xr.apply_ufunc(np.sqrt,
+                                            (ds['tsideLength'] ** 2).mean(
+                                                dim='vertexDegree'))
+    ds['rmse_tsideLength'].attrs = {
+        'name': 'Rmse side length',
+        'units': 'km',
+        'long_name': 'Root mean squared side length.'
+    }
+
+    ds['ratio_tsideLength'] = ds['min_tsideLength'] / ds['max_tsideLength']
+    ds['ratio_tsideLength'].attrs = {
+        'name': 'Ratio of side lengths',
+        'units': 'km',
+        'long_name': 'Ratio between minimum and maximum side lengths of a triangle.'
+    }
+
+    ds['triangleDistortion'] = xr.apply_ufunc(np.sqrt, (
+                (ds['tsideLength'] - ds['rmse_tsideLength']) ** 2).mean(
+        dim='vertexDegree')) / ds['rmse_tsideLength']
+    ds['triangleDistortion'].attrs = {
+        'name': 'Triangle Distortion',
+        'units': 'km',
+        'long_name': 'Triangle Distortion: computed from the distance between cell centers surrounding a vertex.'
+    }
+
+    # Circumscribing circle radius :
+    ds['circums_radius'] = xr.DataArray(data=circ_radius, dims=('nVertices'))
+    ds['circums_radius'].attrs = {
+        'name': 'Radius of the circumscribing circle',
+        'units': 'km',
+        'long_name': 'Radius of the circumscribing circle of a triangle.'
+    }
+
+    # https://gmd.copernicus.org/articles/10/2117/2017/gmd-10-2117-2017.pdf
+    # definition 2 (radius-edge ratio)
+    ds['radius_edge_ratio'] = ds['circums_radius'] / ds['min_tsideLength']
+    ds['circums_radius'].attrs = {
+        'name': 'Radius-edge ratio',
+        'units': '',
+        'long_name': 'The radius-edge ratio is a measure of element shape quality: circums_radius/min_tsideLength'
+    }
+
+    # Area triangle:
+    # Definition 3 (area–length ratio)
+    ds['area_triangle'] = xr.DataArray(data=area_triangles, dims=('nVertices'))
+    ds['area_triangle'].attrs = {
+        'name': 'Area of a triangle',
+        'units': 'km',
+        'long_name': 'Area of a triangle (from latlon distances).'
+    }
+
+    ds['area_length_ratio'] = 4 * np.sqrt(3) / 3 * ds['area_triangle'] / (
+                ds['rmse_tsideLength'] ** 2)
+    ds['area_length_ratio'].attrs = {
+        'name': 'Area-length ratio',
+        'units': 'km',
+        'long_name': 'Area-length ratio: 4sqrt(3)/3  area/(rmse_tsideLength)**2'
+    }
+
+    return ds

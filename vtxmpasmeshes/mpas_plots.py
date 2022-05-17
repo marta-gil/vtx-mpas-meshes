@@ -145,8 +145,9 @@ def view_mpas_regional_mesh(mpas_grid_file, outfile=None,
     plot_kwargs = set_plot_kwargs(da=ds[vname], **kwargs)
 
     # --------
-    plot_mpas_darray(ds, vname, ax=ax, **plot_kwargs,
-                     title=vname + ': ' + name + ' (' + str(ncells) + ')')
+    tit = vname + ': ' + name + ' (' + str(ncells) + ')'
+    plot_mpas_darray(ds, vname, ax=ax, title=tit, **plot_kwargs)
+
     if do_plot_era5_grid:
         plot_era5_grid(ax)
     if do_plot_resolution_rings:
@@ -172,17 +173,17 @@ def compare_plot_mpas_regional_meshes(list_mesh_files, outfile=None,
         full = False
 
     names = []
-    datasets = {}
+    datasets = []
     for f in list_mesh_files:
         name = os.path.basename(f).replace('.grid.nc', '')
-        datasets[name] = open_mpas_regional_file(f, full=full)
+        datasets.append(open_mpas_regional_file(f, full=full))
         names.append(name)
 
-    vars_list = [ds[vname] for ds in datasets.values()]
+    vars_list = [ds[vname] for ds in datasets]
     plot_kwargs = set_plot_kwargs(list_darrays=vars_list, **kwargs)
 
     if border_radius is None:
-        max_borders = get_max_borders(datasets.values(),
+        max_borders = get_max_borders(datasets,
                                       namelat='latitude',
                                       namelon='longitude')
     else:
@@ -191,13 +192,13 @@ def compare_plot_mpas_regional_meshes(list_mesh_files, outfile=None,
         central_lat = kwargs.get('lat_ref', None)
         central_lon = kwargs.get('lon_ref', None)
 
-        for ds in datasets.values():
+        for ds in datasets:
             if central_lat is not None and central_lon is not None:
                 break
             central_lat = ds.attrs.get('vtx-param-lat_ref', None)
             central_lon = ds.attrs.get('vtx-param-lon_ref', None)
         if central_lon is None or central_lat is None:
-            max_borders = get_max_borders(datasets.values(),
+            max_borders = get_max_borders(datasets,
                                           namelat='latitude',
                                           namelon='longitude')
         else:
@@ -217,19 +218,19 @@ def compare_plot_mpas_regional_meshes(list_mesh_files, outfile=None,
         i, j = m // ncols, m % ncols
 
         each_title = kwargs.get('each_title', '<NAME>')
-        ncells = str(datasets[name].dims['nCells'])
+        ncells = str(datasets[m].dims['nCells'])
         each_title = each_title.replace('<NAME>', name)
         each_title = each_title.replace('<NCELLS>', ncells)
 
         axs[i, j] = plt.subplot(g[i, j], projection=ccrs.PlateCarree())
         add_cartopy_details(axs[i, j])
-        plot_mpas_darray(datasets[name], vname,
+        plot_mpas_darray(datasets[m], vname,
                          ax=axs[i, j], **plot_kwargs,
                          title=each_title, borders=max_borders)
         if do_plot_era5_grid:
             plot_era5_grid(axs[i, j])
         if do_plot_resolution_rings:
-            plot_expected_resolution_rings(datasets[name], ax=axs[i, j])
+            plot_expected_resolution_rings(datasets[m], ax=axs[i, j])
 
     for ax in axs[:, -1]:
         ax.axis('off')

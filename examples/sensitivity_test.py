@@ -1,28 +1,30 @@
 import os
 
+import pandas as pd
+
 from vtxmpasmeshes.mesh_generator import full_generation_process
 from vtxmpasmeshes.mpas_plots import compare_plot_mpas_regional_meshes, \
     view_mpas_regional_mesh
 
 
 DATA_FOLDER = '/home/marta/PycharmProjects/vtx-mpas-meshes/data/' \
-              'sensitivity-test-2'
+              'sensitivity-test-3'
 
 # SITE: perdigao
-
 lat_ref = 39.7136
 lon_ref = -7.73
 
+details = {}
 grids = []
 for margin in [50, 75, 100, 125, 150, 250]:
     for size in [15, 25, 35, 50]:
+
         name = 'senst_s' + str(size).zfill(2) + '_m' + str(margin).zfill(3)
         folder = DATA_FOLDER + '/' + name + '/'
         basename = folder + name
 
         global_mesh = basename + '.grid.nc'
-        regional_mesh = DATA_FOLDER + '/' + name + '.region.grid.nc'
-        if not os.path.exists(regional_mesh):
+        if not os.path.exists(global_mesh):
             os.system('mkdir -p ' + folder)
 
             # I do a global mesh centered at 0,0 -> to use in MPAS workflow
@@ -34,6 +36,29 @@ for margin in [50, 75, 100, 125, 150, 250]:
                 lat_ref=0., lon_ref=0.,
             )
 
+        configid = '99' + str(size).zfill(2) + str(margin).zfill(3)
+        details[name] = {
+            'globalfile': global_mesh,
+            'configid': configid,
+            'size': size,
+            'margin': margin,
+            'radius': size+margin,
+        }
+
+        with open(DATA_FOLDER + '/config.' + configid + '.txt', 'w') as f:
+            f.write('mesh=' + name + '.grid.nc \n')
+            f.write('resolution=3' + '\n')
+            f.write('radius=' + str(size + margin) + '\n')
+            f.write('product=raw' + '\n')
+            f.write('max_num_domains=2' + '\n')
+            f.write('time_integration_order=2' + '\n')
+            f.write('two_way_nesting=false' + '\n')
+            f.write('stream_list=\'reduced\'' + '\n')
+            f.write('final_vars=\'reduced\'' + '\n')
+            f.write('levs=\'as_vortex\'' + '\n')
+
+        regional_mesh = DATA_FOLDER + '/' + name + '.region.grid.nc'
+        if not os.path.exists(regional_mesh):
             # I do a regional mesh at my location -> with 4 layers
             full_generation_process(
                 regional_mesh, 'doughnut',
@@ -61,6 +86,10 @@ for margin in [50, 75, 100, 125, 150, 250]:
         print('\nDONE. This is the mesh ' + regional_mesh)
         grids.append(regional_mesh)
 
+info = pd.DataFrame.from_dict(details, orient='index')
+print(info)
+info.to_csv(DATA_FOLDER + '/info.csv')
+
 
 kwargs_set = {
     'default': {},
@@ -69,18 +98,36 @@ kwargs_set = {
 }
 
 for test, kwargs in kwargs_set.items():
-    compare_plot_mpas_regional_meshes(grids,
-                                      outfile=DATA_FOLDER +
-                                              '/distortion.' + test + '.png',
-                                      suptitle='Meshes comparison: Distortion',
-                                      vname='cellDistortion',
-                                      each_title='<NAME>: <NCELLS> cells',
-                                      lat_ref=lat_ref,
-                                      lon_ref=lon_ref,
-                                      cmap='magma',
-                                      **kwargs
-                                      )
 
+    f = DATA_FOLDER + '/distortion.' + test + '.png'
+    if not os.path.isfile(f):
+        compare_plot_mpas_regional_meshes(grids,
+                                          outfile=f,
+                                          suptitle='Meshes comparison: '
+                                                   'Distortion',
+                                          vname='cellDistortion',
+                                          each_title='<NAME>: '
+                                                     '<NCELLS> cells',
+                                          lat_ref=lat_ref,
+                                          lon_ref=lon_ref,
+                                          cmap='magma',
+                                          **kwargs
+                                          )
+
+    f = DATA_FOLDER + '/ratio_al.' + test + '.png'
+    if not os.path.isfile(f):
+        compare_plot_mpas_regional_meshes(grids,
+                                          outfile=f,
+                                          suptitle='Meshes comparison: '
+                                                   'A/L Ratio',
+                                          vname='area_length_ratio',
+                                          each_title='<NAME>: '
+                                                     '<NCELLS> cells',
+                                          lat_ref=lat_ref,
+                                          lon_ref=lon_ref,
+                                          cmap='magma',
+                                          **kwargs
+                                          )
 kwargs_set = {
     'default': {},
     '200': {'border_radius': 200, 'vmin': 3, 'vmax': 20},
@@ -89,12 +136,14 @@ kwargs_set = {
 }
 
 for test, kwargs in kwargs_set.items():
-    compare_plot_mpas_regional_meshes(grids,
-                                      outfile=DATA_FOLDER +
-                                              '/compare.' + test + '.png',
-                                      suptitle='Meshes comparison',
-                                      each_title='<NAME>: <NCELLS> cells',
-                                      lat_ref=lat_ref,
-                                      lon_ref=lon_ref,
-                                      **kwargs
-                                      )
+    f = DATA_FOLDER + '/compare.' + test + '.png'
+    if not os.path.isfile(f):
+        compare_plot_mpas_regional_meshes(grids,
+                                          outfile=f,
+                                          suptitle='Meshes comparison',
+                                          each_title='<NAME>: '
+                                                     '<NCELLS> cells',
+                                          lat_ref=lat_ref,
+                                          lon_ref=lon_ref,
+                                          **kwargs
+                                          )

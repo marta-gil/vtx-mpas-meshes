@@ -206,19 +206,12 @@ def plot_mpas_darray(ds, vname, ax=None, outfile=None, **kwargs):
 
     plot_kwargs = set_plot_kwargs(da=da, **kwargs)
 
-    for i, cell in enumerate(da['nCells'].values):
-        value = da.sel(nCells=cell)
-
-        vals = ds['verticesOnCell'].sel(nCells=cell).values
-        num_sides = int(ds['nEdgesOnCell'].sel(nCells=cell))
-        vals = vals[:num_sides] - 1
-        lats = ds['latitudeVertex'].sel(nVertices=vals)
-        lons = ds['longitudeVertex'].sel(nVertices=vals)
-
-        color = colorvalue(value, **plot_kwargs)
-
-        ax.fill(lons, lats, edgecolor=None, linewidth=0.0,
-                facecolor=color)
+    if 'nCells' in ds[vname].dims:
+        plot_cells_mpas(ds, vname, ax, **plot_kwargs)
+    elif 'nVertices' in ds[vname].dims:
+        plot_dual_mpas(ds, vname, ax, **plot_kwargs)
+    else:
+        print('WARNING  Impossible to plot!')
 
     units = da.attrs.get('units', '')
     name = kwargs.get('name', '')
@@ -235,6 +228,41 @@ def plot_mpas_darray(ds, vname, ax=None, outfile=None, **kwargs):
         add_colorbar(ax, label=title_legend, **plot_kwargs)
 
         close_plot(outfile=outfile)
+    return
+
+
+def plot_cells_mpas(ds, vname, ax, **plot_kwargs):
+    for i, cell in enumerate(ds['nCells'].values):
+        value = ds[vname].sel(nCells=cell)
+
+        vals = ds['verticesOnCell'].sel(nCells=cell).values
+        num_sides = int(ds['nEdgesOnCell'].sel(nCells=cell))
+        vals = vals[:num_sides] - 1
+        lats = ds['latitudeVertex'].sel(nVertices=vals)
+        lons = ds['longitudeVertex'].sel(nVertices=vals)
+
+        color = colorvalue(value, **plot_kwargs)
+
+        ax.fill(lons, lats, edgecolor=None, linewidth=0.0,
+                facecolor=color)
+
+
+def plot_dual_mpas(ds, vname, ax, **plot_kwargs):
+    for vertex in ds['nVertices'].values:
+        value = ds[vname].sel(nVertices=vertex)
+
+        vals = ds['cellsOnVertex'].sel(nVertices=vertex).values
+        if 0 in vals:
+            # Border triangle
+            continue
+        vals = vals - 1
+        lats = ds['latitude'].sel(nCells=vals)
+        lons = ds['longitude'].sel(nCells=vals)
+
+        color = colorvalue(value, **plot_kwargs)
+
+        ax.fill(lons, lats, edgecolor=None, linewidth=0.0,
+                facecolor=color)
     return
 
 

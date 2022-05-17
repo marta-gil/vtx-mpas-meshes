@@ -66,10 +66,35 @@ def jigsaw_gen_sph_grid(cellWidth, x, y, earth_radius=6371.0e3,
     opts.hfun_hmax = float("inf")
     opts.hfun_hmin = 0.0
     opts.mesh_dims = +2  # 2-dim. simplexes
+    # MARTA CHANGES
     opts.mesh_iter = 500000
+        # %   OPTS.MESH_ITER - {default=+INF} max. number of mesh ref-
+        # %       inement iterations. Set ITER=N to see progress after
+        # %       N iterations.
     opts.optm_qlim = 0.9375
-    opts.optm_qtol = 1.0e-6
-    opts.optm_iter = 500000
+        # %   OPTS.OPTM_QLIM - {default=0.9375} threshold on mesh cost
+        # %       function above which gradient-based optimisation is
+        # %       attempted.
+    opts.optm_qtol = 1.0e-7
+        # %   OPTS.OPTM_QTOL - {default=1.E-04} tolerance on mesh cost
+        # %       function for convergence. Iteration on a given node
+        # %       is terminated if adjacent element cost-functions are
+        # %       improved by less than QTOL.
+
+    opts.optm_iter = 5000
+        # %   OPTS.OPTM_ITER - {default=16} max. number of mesh optim-
+        # %       isation iterations. Set ITER=N to see progress after
+        # %       N iterations.
+
+    # new opts
+    # %   OPTS.MESH_OFF2 - {default=0.90} radius-edge ratio target
+    # %       for insertion of "shape"-type offcentres for 2-tria
+    # %       elements. When refining an element II, offcentres
+    # %       are positioned to form a new "frontal" element JJ
+    # %       that satisfies JRAD <= OFF2.
+    opts.mesh_off2 = 0.97
+
+    # -----------------
     opts.verbosity = +1
     jig.savejig(opts.jcfg_file, opts)
 
