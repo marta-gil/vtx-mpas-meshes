@@ -2,6 +2,7 @@ import os
 
 import pandas as pd
 
+from vtxmpasmeshes.dataset_utilities import open_mpas_regional_file
 from vtxmpasmeshes.mesh_generator import full_generation_process
 from vtxmpasmeshes.mpas_plots import compare_plot_mpas_regional_meshes, \
     view_mpas_regional_mesh
@@ -68,6 +69,12 @@ for margin in [50, 75, 100, 125, 150, 250]:
                 size=size, margin=margin,
                 lat_ref=lat_ref, lon_ref=lon_ref,
             )
+
+        view_mpas_regional_mesh(regional_mesh,
+                                do_plot_resolution_rings=True,
+                                do_plot_era5_grid=False,
+                                do_plot_wrf_grid=True,
+                                vname='resolution')
 
         f = DATA_FOLDER + '/' + name + '.resolution_mesh.png'
         if not os.path.isfile(f):

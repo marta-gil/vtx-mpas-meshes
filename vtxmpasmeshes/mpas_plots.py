@@ -2,19 +2,22 @@ import os
 
 import numpy as np
 from shapely.geometry import Polygon
+import math
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 from cartopy.geodesic import Geodesic
 from matplotlib.backends.backend_pdf import PdfPages
+from geopy.distance import distance
 
-from vtxmpasmeshes.dataset_utilities import open_mpas_regional_file
+from vtxmpasmeshes.dataset_utilities import open_mpas_regional_file, \
+    get_borders_at_distance, mpas_mesh_equivalent_wrf
 
 from vtxmpasmeshes.plot_utilities import plot_latlon_cartopy, \
     plot_mpas_darray, set_plot_kwargs, add_colorbar, \
     start_cartopy_map_axis, close_plot, add_cartopy_details, \
-    get_plot_size, get_max_borders, get_borders_at_distance
+    get_plot_size, get_max_borders
 
 
 def view_resolution_map(ds, pdfname=None, list_distances=None, **kwargs):
@@ -118,13 +121,60 @@ def plot_era5_grid(ax):
     era5_lats = np.arange(-90, 90, 0.25)
     gl.xlocator = mpl.ticker.FixedLocator(era5_lons)
     gl.ylocator = mpl.ticker.FixedLocator(era5_lats)
-    gl.xlabel_style = {'size': 15, 'color': 'gray'}
-    gl.xlabel_style = {'color': 'red', 'weight': 'bold'}
+
+
+def plot_wrf_grid(ds, ax=None):
+    # test that the dataset has the expected attributes
+    try:
+        centerlat = ds.attrs['vtx-param-lat_ref']
+        centerlon = ds.attrs['vtx-param-lon_ref']
+    except KeyError as e:
+        print('The dataset has to be an MPAS mesh created by the '
+              'vtx generation flow (attributes vtx-param-)')
+        raise e
+
+    wrf_details = mpas_mesh_equivalent_wrf(ds)
+    num_domains = int(wrf_details['max_domains'])
+
+    colors = ['red', 'green', 'purple', 'orange']
+    for domain in range(1, num_domains + 1):
+
+        resol_km = int(wrf_details['d' + str(domain) + 'res'])
+        num_cells = int(wrf_details['d' + str(domain) + 'e_wesn']) - 1
+
+        len_grid = distance(kilometers=float(resol_km * num_cells)) / 2
+
+        maxlat = len_grid.destination(point=(centerlat, centerlon),
+                                      bearing=0).latitude
+        minlat = len_grid.destination(point=(centerlat, centerlon),
+                                      bearing=180).latitude
+        maxlon = len_grid.destination(point=(centerlat, centerlon),
+                                      bearing=90).longitude
+        minlon = len_grid.destination(point=(centerlat, centerlon),
+                                      bearing=270).longitude
+
+        directions = {'positive': [0, 90], 'negative': [180, 270]}
+
+        for cell in range(math.ceil(num_cells / 2)):
+
+            d = distance(  # cells resolution (max res) times <cell>
+                kilometers=float(resol_km * (cell + 1 / 2)))
+            for degrees in directions.values():
+                vert = d.destination(point=(centerlat, centerlon),
+                                     bearing=degrees[0])
+                hori = d.destination(point=(centerlat, centerlon),
+                                     bearing=degrees[1])
+
+                ax.plot([hori.longitude, hori.longitude], [minlat, maxlat],
+                        linewidth=0.8, color=colors[domain - 1])
+                ax.plot([minlon, maxlon], [vert.latitude, vert.latitude],
+                        linewidth=0.8, color=colors[domain - 1])
 
 
 def view_mpas_regional_mesh(mpas_grid_file, outfile=None,
                             do_plot_resolution_rings=True,
                             do_plot_era5_grid=False,
+                            do_plot_wrf_grid=False,
                             vname='resolution',
                             **kwargs):
 
@@ -152,6 +202,8 @@ def view_mpas_regional_mesh(mpas_grid_file, outfile=None,
         plot_era5_grid(ax)
     if do_plot_resolution_rings:
         plot_expected_resolution_rings(ds, ax=ax)
+    if do_plot_wrf_grid:
+        plot_wrf_grid(ds, ax=ax)
     # --------
 
     add_colorbar(ax, label=vname + ' (' + units + ')', **plot_kwargs)

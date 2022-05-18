@@ -1,6 +1,7 @@
 import numpy as np
 import xarray as xr
 import math
+from geopy.distance import distance
 
 
 derived_variables = {
@@ -30,7 +31,7 @@ def distance_latlon_matrix(lat, lon, lat_ref=0., lon_ref=0., do_tile=False):
     return km
 
 
-def add_mpas_mesh_variables(ds, full=True):
+def add_mpas_mesh_variables(ds, full=True, **kwargs):
     for v in ds.data_vars:
         if v not in derived_variables:
             continue
@@ -61,7 +62,7 @@ def add_mpas_mesh_variables(ds, full=True):
 
             elif newv == 'resolution':
                 radius_circle = ds.attrs.get('sphere_radius', 1.0)
-                if radius_circle == 1:
+                if radius_circle == 1.0:
                     #print('need to correct to earth radius!!')
                     correction_rad_earth = 6371220.0
                 else:
@@ -75,7 +76,12 @@ def add_mpas_mesh_variables(ds, full=True):
                 ds[newv].attrs['long_name'] = 'Resolution of the cell (approx)'
 
     if full:
-        ds = add_distance_to_reference(ds)
+        ref_point = {}
+        for v in ['lat_ref', 'lon_ref']:
+            if v in kwargs:
+                ref_point[v] = kwargs[v]
+        ds = add_distance_to_reference(ds, **ref_point)
+
         ds = compute_metrics_edge_lengths(ds)
         ds = compute_metrics_triangle_quality(ds)
 
@@ -238,8 +244,12 @@ def compute_metrics_triangle_quality(ds):
 
 
 def add_distance_to_reference(ds, **kwargs):
-    lat_ref = kwargs.get('lat_ref', ds.attrs['vtx-param-lat_ref'])
-    lon_ref = kwargs.get('lon_ref', ds.attrs['vtx-param-lon_ref'])
+    lat_ref = kwargs.get('lat_ref', ds.attrs.get('vtx-param-lat_ref', None))
+    lon_ref = kwargs.get('lon_ref', ds.attrs.get('vtx-param-lon_ref', None))
+
+    if lat_ref is None or lon_ref is None:
+        print('WARNING Not enough info to add distance to center')
+        return ds
 
     d = get_distance_to_center(ds['latitude'].values, ds['longitude'].values,
                                center_lat=lat_ref, center_lon=lon_ref)
@@ -390,3 +400,124 @@ def compute_metrics_triangle_quality(ds):
     }
 
     return ds
+
+
+def get_borders_at_distance(distance_km, centerlat=0., centerlon=0.):
+    len_grid = distance(kilometers=distance_km)
+
+    maxlat = len_grid.destination(point=(centerlat, centerlon),
+                                  bearing=0).latitude
+    minlat = len_grid.destination(point=(centerlat, centerlon),
+                                  bearing=180).latitude
+    maxlon = len_grid.destination(point=(centerlat, centerlon),
+                                  bearing=90).longitude
+    minlon = len_grid.destination(point=(centerlat, centerlon),
+                                  bearing=270).longitude
+
+    return minlon, maxlon, minlat, maxlat
+
+
+def find_min_number_wrf_cells(distance_km=None, resolution_km=None,
+                              previous_domain_cells=0,
+                              margin_cells_each_side=9,
+                              force_buffer=False):
+
+    if distance_km is not None and resolution_km is not None:
+        min_num_cells = int(distance_km / resolution_km)
+    else:
+        min_num_cells = 1
+
+    # num wrf cells has to be odd and multiple of 3.
+    # it also has to be >= 27 and > previous domain num cells / 3 + 18
+
+    if previous_domain_cells > 0:
+        at_least = int(previous_domain_cells / 3 + 2*margin_cells_each_side)
+        min_num_cells = max(min_num_cells, at_least)
+
+    if force_buffer:
+        smallest_grid = int(2 * margin_cells_each_side)
+        min_num_cells = max(min_num_cells, smallest_grid)
+
+    while not min_num_cells % 2 != 0 or not min_num_cells % 3 == 0:
+        min_num_cells += 1
+
+    return min_num_cells
+
+
+def equivalent_wrf_domains(highresolution, diameter, lowresolution,
+                           max_domains=2, silent=False):
+
+    highresolution = int(highresolution)
+    lowresolution = int(lowresolution)
+
+    # Find resolution outer domain
+    options = [int(highresolution * 3 ** i) for i in range(max_domains)]
+    # find the option closest to lowresolution
+    dists = [abs(lowresolution - option) for option in options]
+    mindist = np.argmin(dists)
+    resol_nests = options[:(mindist+1)]
+    num_domains = len(resol_nests)
+
+    domains_def = {
+        'max_domains': str(num_domains),
+    }
+
+    num_cells = {}
+    for nest in range(num_domains):
+        # nest = 0 is the highest resolution / smaller domain
+        # but nest = 0 means highest domain = num_domains
+        # The outer nest is domain = 1 and nest = num_domains - 1
+        domain = num_domains - nest
+
+        # Resolution
+        domains_def['d' + str(domain) + 'res'] = str(resol_nests[nest])
+
+        # Number of cells
+        if nest == 0:
+            wrf_cells = find_min_number_wrf_cells(
+                distance_km=diameter, resolution_km=highresolution)
+        else:
+            wrf_cells = find_min_number_wrf_cells(
+                previous_domain_cells=num_cells[nest - 1],
+                margin_cells_each_side=9)
+        num_cells[nest] = wrf_cells
+
+        domains_def['d' + str(domain) + 'e_wesn'] = \
+            str(wrf_cells + 1)
+
+        if not silent:
+            print('\nNested n', nest, ' / Domain d', domain)
+            print('\tResolution:', resol_nests[nest], 'km')
+            print('\t' + str(wrf_cells) + 'x' + str(wrf_cells),
+                  'WRF cells of', resol_nests[nest], 'km resolution.')
+
+    for domain in range(1, num_domains + 1):
+        nest = num_domains - domain
+
+        if domain == 1:
+            print('Lowest Resolution domain')
+            dij = 1
+        else:
+            print('Inner domain')
+            # quantes celes del domini superior (domain-1) ocupa?
+            upper_cells_total = num_cells[nest + 1] - 1
+            upper_cells_covered = (num_cells[nest] - 1) / 3
+            dij = int(((upper_cells_total - upper_cells_covered) / 2) + 1)
+
+        # Starting ij
+        domains_def['d' + str(domain) + 'dij'] = str(dij)
+
+    return domains_def
+
+
+def mpas_mesh_equivalent_wrf(ds, **kwargs):
+    highresolution = kwargs.get('highresolution',
+                                ds.attrs.get('vtx-param-highresolution', None))
+    size = kwargs.get('size', ds.attrs.get('vtx-param-size', None))
+    lowresolution = kwargs.get('lowresolution',
+                                ds.attrs.get('vtx-param-lowresolution', None))
+
+    ewrf = equivalent_wrf_domains(highresolution, 2*size, lowresolution,
+                                  max_domains=2, silent=True)
+    return ewrf
+

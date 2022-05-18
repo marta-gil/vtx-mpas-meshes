@@ -5,7 +5,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-from geopy.distance import distance
 
 
 # OPEN AND CLOSE PLOTS
@@ -107,21 +106,6 @@ def find_borders(lats, lons, margin='factor2'):
         limits = minlon, maxlon, minlat, maxlat
 
     return limits
-
-
-def get_borders_at_distance(distance_km, centerlat=0., centerlon=0.):
-    len_grid = distance(kilometers=distance_km)
-
-    maxlat = len_grid.destination(point=(centerlat, centerlon),
-                                  bearing=0).latitude
-    minlat = len_grid.destination(point=(centerlat, centerlon),
-                                  bearing=180).latitude
-    maxlon = len_grid.destination(point=(centerlat, centerlon),
-                                  bearing=90).longitude
-    minlon = len_grid.destination(point=(centerlat, centerlon),
-                                  bearing=270).longitude
-
-    return minlon, maxlon, minlat, maxlat
 
 
 # BASIC LATLON PLOT
