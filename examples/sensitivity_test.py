@@ -49,7 +49,9 @@ for margin in [50, 75, 100, 125, 150, 250]:
         with open(DATA_FOLDER + '/config.' + configid + '.txt', 'w') as f:
             f.write('mesh=' + name + '.grid.nc \n')
             f.write('resolution=3' + '\n')
+            f.write('inner_size=' + str(size) + '\n')
             f.write('radius=' + str(size + margin) + '\n')
+            f.write('num_boundary_layers=8' + '\n')
             f.write('product=raw' + '\n')
             f.write('max_num_domains=2' + '\n')
             f.write('time_integration_order=2' + '\n')
@@ -65,16 +67,20 @@ for margin in [50, 75, 100, 125, 150, 250]:
                 regional_mesh, 'doughnut',
                 redo=False, do_plots=False, do_region=True,
                 highresolution=3, lowresolution=20,
-                num_boundary_layers=4,
+                num_boundary_layers=8,
                 size=size, margin=margin,
                 lat_ref=lat_ref, lon_ref=lon_ref,
             )
 
-        view_mpas_regional_mesh(regional_mesh,
-                                do_plot_resolution_rings=True,
-                                do_plot_era5_grid=False,
-                                do_plot_wrf_grid=True,
-                                vname='resolution')
+        f = DATA_FOLDER + '/' + name + '.mpaswrf_mesh.png'
+        if not os.path.isfile(f):
+            print('MPAS WRF Plots')
+            view_mpas_regional_mesh(regional_mesh,
+                                    outfile=f,
+                                    do_plot_resolution_rings=True,
+                                    do_plot_era5_grid=False,
+                                    do_plot_wrf_grid=True,
+                                    vname='resolution')
 
         f = DATA_FOLDER + '/' + name + '.resolution_mesh.png'
         if not os.path.isfile(f):
