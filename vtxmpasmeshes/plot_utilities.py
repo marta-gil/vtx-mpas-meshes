@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 
+from vtxmpasmeshes.dataset_utilities import get_borders_at_distance, \
+    get_center
+
 
 # OPEN AND CLOSE PLOTS
 
@@ -179,12 +182,24 @@ def plot_mpas_darray(ds, vname, ax=None, outfile=None, **kwargs):
         final = True
         ax = start_cartopy_map_axis()
 
-    if 'borders' not in kwargs:
+    borders = kwargs.get('borders', None)
+    if borders is None:
         lats = ds['latitude'].values.flatten()
         lons = ds['longitude'].values.flatten()
-        borders = find_borders(lats, lons)
-    else:
-        borders = kwargs['borders']
+        if 'border_radius' in kwargs:
+            central_lat = kwargs.get('lat_ref', None)
+            central_lon = kwargs.get('lon_ref', None)
+            if central_lon is None or central_lat is None:
+                central_lat = ds.attrs.get('vtx-param-lat_ref', None)
+                central_lon = ds.attrs.get('vtx-param-lon_ref', None)
+            if central_lon is None or central_lat is None:
+                central_lat, central_lon = get_center(lats, lons)
+            borders = get_borders_at_distance(kwargs['border_radius'],
+                                              centerlat=central_lat,
+                                              centerlon=central_lon,
+                                              )
+        else:
+            borders = find_borders(lats, lons)
 
     ax.set_extent(borders, crs=ccrs.PlateCarree())
 
