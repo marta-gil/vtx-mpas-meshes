@@ -186,7 +186,8 @@ def plot_mpas_darray(ds, vname, ax=None, outfile=None, **kwargs):
     if borders is None:
         lats = ds['latitude'].values.flatten()
         lons = ds['longitude'].values.flatten()
-        if 'border_radius' in kwargs:
+        border_radius = kwargs.get('border_radius', None)
+        if border_radius is not None:
             central_lat = kwargs.get('lat_ref', None)
             central_lon = kwargs.get('lon_ref', None)
             if central_lon is None or central_lat is None:

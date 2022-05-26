@@ -355,6 +355,11 @@ def full_generation_process(mpas_grid_file, grid, redo=True,
     mpas_ds = xr.open_dataset(mpas_grid_file_tmp)
     for name, value in resolution_ds.attrs.items():
         mpas_ds.attrs['vtx-param-' + str(name)] = value
+    if do_region:
+        mpas_ds.attrs['vtx-region-num_boundary_layers'] = num_boundary_layers
+        lowres = mpas_ds.attrs['vtx-param-lowresolution']
+        region_border = radius + (num_boundary_layers * lowres) * 0.6
+        mpas_ds.attrs['vtx-region_border'] = region_border
 
     # Update the duration of the steps
     durations_process = {

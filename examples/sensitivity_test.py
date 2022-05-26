@@ -15,6 +15,10 @@ DATA_FOLDER = '/home/marta/PycharmProjects/vtx-mpas-meshes/data/' \
 lat_ref = 39.7136
 lon_ref = -7.73
 
+highres = 3
+lowres = 20
+numlayers = 8
+
 details = {}
 grids = []
 for margin in [50, 75, 100, 125, 150, 250]:
@@ -32,25 +36,29 @@ for margin in [50, 75, 100, 125, 150, 250]:
             full_generation_process(
                 global_mesh, 'doughnut',
                 redo=False, do_plots=False, do_region=False,
-                highresolution=3, lowresolution=20,
+                highresolution=highres, lowresolution=lowres,
                 size=size, margin=margin,
                 lat_ref=0., lon_ref=0.,
             )
 
+        radius = size+margin
+        region_border = radius + (numlayers*lowres)*0.9
         configid = '99' + str(size).zfill(2) + str(margin).zfill(3)
         details[name] = {
             'globalfile': global_mesh,
             'configid': configid,
             'size': size,
             'margin': margin,
-            'radius': size+margin,
+            'radius': radius,
+            'region_border': region_border,
         }
 
         with open(DATA_FOLDER + '/config.' + configid + '.txt', 'w') as f:
             f.write('mesh=' + name + '.grid.nc \n')
             f.write('resolution=3' + '\n')
             f.write('inner_size=' + str(size) + '\n')
-            f.write('radius=' + str(size + margin) + '\n')
+            f.write('radius=' + str(radius) + '\n')
+            f.write('region_border=' + str(region_border) + '\n')
             f.write('num_boundary_layers=8' + '\n')
             f.write('product=raw' + '\n')
             f.write('max_num_domains=2' + '\n')
@@ -66,8 +74,8 @@ for margin in [50, 75, 100, 125, 150, 250]:
             full_generation_process(
                 regional_mesh, 'doughnut',
                 redo=False, do_plots=False, do_region=True,
-                highresolution=3, lowresolution=20,
-                num_boundary_layers=8,
+                highresolution=highres, lowresolution=lowres,
+                num_boundary_layers=numlayers,
                 size=size, margin=margin,
                 lat_ref=lat_ref, lon_ref=lon_ref,
             )
@@ -77,6 +85,17 @@ for margin in [50, 75, 100, 125, 150, 250]:
             print('MPAS WRF Plots')
             view_mpas_regional_mesh(regional_mesh,
                                     outfile=f,
+                                    do_plot_resolution_rings=True,
+                                    do_plot_era5_grid=False,
+                                    do_plot_wrf_grid=True,
+                                    vname='resolution')
+
+        f = DATA_FOLDER + '/' + name + '.mpaswrf_mesh.2.png'
+        if not os.path.isfile(f):
+            print('MPAS WRF Plots 2')
+            view_mpas_regional_mesh(regional_mesh,
+                                    outfile=f,
+                                    border_radius=1000,
                                     do_plot_resolution_rings=True,
                                     do_plot_era5_grid=False,
                                     do_plot_wrf_grid=True,
@@ -98,6 +117,8 @@ for margin in [50, 75, 100, 125, 150, 250]:
         print('\n' + '*' * 30)
         print('\nDONE. This is the mesh ' + regional_mesh)
         grids.append(regional_mesh)
+
+        break
 
 info = pd.DataFrame.from_dict(details, orient='index')
 print(info)

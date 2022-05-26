@@ -176,6 +176,7 @@ def view_mpas_regional_mesh(mpas_grid_file, outfile=None,
                             do_plot_era5_grid=False,
                             do_plot_wrf_grid=False,
                             vname='resolution',
+                            border_radius=None,
                             **kwargs):
 
     if vname != 'resolution':
@@ -196,7 +197,13 @@ def view_mpas_regional_mesh(mpas_grid_file, outfile=None,
 
     # --------
     tit = vname + ': ' + name + ' (' + str(ncells) + ')'
-    plot_mpas_darray(ds, vname, ax=ax, title=tit, **plot_kwargs)
+    array_plot_kwgs = {**plot_kwargs}
+    if 'border_radius' in kwargs:
+        if kwargs['border_radius'] is not None:
+            array_plot_kwgs['border_radius'] = kwargs['border_radius']
+
+    plot_mpas_darray(ds, vname, ax=ax, title=tit,
+                     border_radius=border_radius, **array_plot_kwgs)
 
     if do_plot_era5_grid:
         plot_era5_grid(ax)

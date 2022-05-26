@@ -424,6 +424,9 @@ def find_min_number_wrf_cells(distance_km=None, resolution_km=None,
 
     if distance_km is not None and resolution_km is not None:
         min_num_cells = int(distance_km / resolution_km)
+        # print('   - distance: %f' % distance_km)
+        # print('   - resolution_km: %f' % resolution_km)
+        # print('   - minimum number: %f' % min_num_cells)
     else:
         min_num_cells = 1
 
@@ -431,6 +434,7 @@ def find_min_number_wrf_cells(distance_km=None, resolution_km=None,
     # it also has to be >= 27 and > previous domain num cells / 3 + 18
 
     if previous_domain_cells > 0:
+        # print('  - previous_domain_cells: %f' % previous_domain_cells)
         at_least = int(previous_domain_cells / 3 + 2*margin_cells_each_side)
         min_num_cells = max(min_num_cells, at_least)
 
@@ -444,19 +448,27 @@ def find_min_number_wrf_cells(distance_km=None, resolution_km=None,
     return min_num_cells
 
 
-def equivalent_wrf_domains(highresolution, diameter, lowresolution,
+def equivalent_wrf_domains(resolutions, diameters,
                            max_domains=2, silent=False):
 
-    highresolution = int(highresolution)
-    lowresolution = int(lowresolution)
+    if len(resolutions) != len(diameters):
+        raise AttributeError('Resolutions and diameters list should '
+                             'be same length')
 
-    # Find resolution outer domain
-    options = [int(highresolution * 3 ** i) for i in range(max_domains)]
-    # find the option closest to lowresolution
-    dists = [abs(lowresolution - option) for option in options]
-    mindist = np.argmin(dists)
-    resol_nests = options[:(mindist+1)]
-    num_domains = len(resol_nests)
+    highresolution = int(resolutions[0])
+    if not resolutions[-1] is None:
+        lowresolution = int(resolutions[-1])
+
+        # Find resolution outer domain
+        options = [int(highresolution * 3 ** i) for i in range(max_domains)]
+        # find the option closest to lowresolution
+        dists = [abs(lowresolution - option) for option in options]
+        mindist = np.argmin(dists)
+        resol_nests = options[:(mindist+1)]
+        num_domains = len(resol_nests)
+    else:
+        num_domains = len(resolutions)
+        resol_nests = [int(highresolution * 3 ** i) for i in range(max_domains)]
 
     domains_def = {
         'max_domains': str(num_domains),
@@ -473,13 +485,14 @@ def equivalent_wrf_domains(highresolution, diameter, lowresolution,
         domains_def['d' + str(domain) + 'res'] = str(resol_nests[nest])
 
         # Number of cells
-        if nest == 0:
-            wrf_cells = find_min_number_wrf_cells(
-                distance_km=diameter, resolution_km=highresolution)
-        else:
+        diameter = diameters[nest]
+        if diameter is None:
             wrf_cells = find_min_number_wrf_cells(
                 previous_domain_cells=num_cells[nest - 1],
                 margin_cells_each_side=9)
+        else:
+            wrf_cells = find_min_number_wrf_cells(
+                distance_km=diameter, resolution_km=resol_nests[nest])
         num_cells[nest] = wrf_cells
 
         domains_def['d' + str(domain) + 'e_wesn'] = \
@@ -512,12 +525,26 @@ def equivalent_wrf_domains(highresolution, diameter, lowresolution,
 
 def mpas_mesh_equivalent_wrf(ds, **kwargs):
     highresolution = kwargs.get('highresolution',
-                                ds.attrs.get('vtx-param-highresolution', None))
+                                ds.attrs.get('vtx-param-highresolution',
+                                             None))
     size = kwargs.get('size', ds.attrs.get('vtx-param-size', None))
     lowresolution = kwargs.get('lowresolution',
-                                ds.attrs.get('vtx-param-lowresolution', None))
+                                ds.attrs.get('vtx-param-lowresolution',
+                                             None))
+    regborder = kwargs.get('region_border', ds.attrs.get('vtx-region_border',
+                                                         None))
 
-    ewrf = equivalent_wrf_domains(highresolution, 2*size, lowresolution,
-                                  max_domains=2, silent=True)
+    if size is not None:
+        innerdiam = 2.*size
+    else:
+        innerdiam = None
+
+    if regborder is not None:
+        outerdiam = 2.*regborder
+    else:
+        outerdiam = None
+
+    ewrf = equivalent_wrf_domains([highresolution, lowresolution],
+                                  [innerdiam, outerdiam], silent=True)
     return ewrf
 
