@@ -3,10 +3,20 @@ import os
 import pandas as pd
 
 from vtxmpasmeshes.dataset_utilities import open_mpas_regional_file
-from vtxmpasmeshes.mesh_generator import full_generation_process
+from vtxmpasmeshes.mesh_generator import full_generation_process, \
+    cut_circular_region_beta
 from vtxmpasmeshes.mpas_plots import compare_plot_mpas_regional_meshes, \
-    view_mpas_regional_mesh
+    view_mpas_regional_mesh, plot_era5_grid, plot_wrf_grid, \
+    plot_expected_resolution_rings
 
+from vtxmpasmeshes.plot_utilities import plot_mpas_darray, \
+    set_plot_kwargs, add_colorbar, \
+    start_cartopy_map_axis, close_plot
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 
 DATA_FOLDER = '/home/marta/PycharmProjects/vtx-mpas-meshes/data/' \
               'sensitivity-test-3'
@@ -21,8 +31,12 @@ numlayers = 8
 
 details = {}
 grids = []
-for margin in [50, 75, 100, 125, 150, 250]:
-    for size in [15, 25, 35, 50]:
+for margin in [50, 75, 100,
+               #125, 150, 250
+               ]:
+    for size in [15, 25, 30,
+                 #35, 50
+                 ]:
 
         name = 'senst_s' + str(size).zfill(2) + '_m' + str(margin).zfill(3)
         folder = DATA_FOLDER + '/' + name + '/'
@@ -90,16 +104,117 @@ for margin in [50, 75, 100, 125, 150, 250]:
                                     do_plot_wrf_grid=True,
                                     vname='resolution')
 
-        f = DATA_FOLDER + '/' + name + '.mpaswrf_mesh.2.png'
-        if not os.path.isfile(f):
-            print('MPAS WRF Plots 2')
-            view_mpas_regional_mesh(regional_mesh,
-                                    outfile=f,
-                                    border_radius=1000,
-                                    do_plot_resolution_rings=True,
-                                    do_plot_era5_grid=False,
-                                    do_plot_wrf_grid=True,
-                                    vname='resolution')
+        vname = 'resolution'
+        units = 'km'
+
+        ds = open_mpas_regional_file(regional_mesh, full=True)
+
+        myats = ds.attrs
+
+        ax = plt.axes(projection=ccrs.PlateCarree())
+        zorder = 2
+        ax.add_feature(cfeature.BORDERS, linestyle=':', zorder=zorder)
+        ax.stock_img()
+        ax.coastlines(resolution='10m', zorder=zorder + 1)
+
+        gl = ax.gridlines(draw_labels=True, alpha=0., linestyle='--',
+                          zorder=zorder + 2)
+        gl.top_labels = False
+        gl.right_labels = False
+
+        plot_kwargs = set_plot_kwargs(ds[vname])
+        plot_mpas_darray(ds, vname, ax=ax, title='', lat_ref=0.,
+                         lon_ref=0., border_radius=None,
+                         **plot_kwargs)
+        plot_expected_resolution_rings(ds, ax=ax)
+        add_colorbar(ax, label=vname + ' (' + units + ')', **plot_kwargs)
+        close_plot(outfile=DATA_FOLDER + '/' + name + '.mpasmesh.png',
+                   size_fig=[6, 4])
+
+        ax = plt.axes(projection=ccrs.PlateCarree())
+        zorder = 2
+        ax.add_feature(cfeature.BORDERS, linestyle=':', zorder=zorder)
+        ax.stock_img()
+        ax.coastlines(resolution='10m', zorder=zorder + 1)
+
+        gl = ax.gridlines(draw_labels=True, alpha=0., linestyle='--',
+                          zorder=zorder + 2)
+        gl.top_labels = False
+        gl.right_labels = False
+
+        plot_kwargs = set_plot_kwargs(ds[vname])
+        plot_mpas_darray(ds, vname, ax=ax, title='', lat_ref=0.,
+                         lon_ref=0., border_radius=None,
+                         **plot_kwargs)
+        plot_expected_resolution_rings(ds, ax=ax)
+        plot_wrf_grid(ds, ax=ax)
+        add_colorbar(ax, label=vname + ' (' + units + ')', **plot_kwargs)
+        close_plot(outfile=DATA_FOLDER + '/' + name + '.mpaswrfmesh.png',
+                   size_fig=[6, 4])
+
+        for border_radius in [size + 10, radius, region_border,
+                              region_border + 200]:
+            ax = plt.axes(projection=ccrs.PlateCarree())
+            zorder = 2
+            ax.add_feature(cfeature.BORDERS, linestyle=':', zorder=zorder)
+            ax.stock_img()
+            ax.coastlines(resolution='10m', zorder=zorder + 1)
+
+            gl = ax.gridlines(draw_labels=True, alpha=0., linestyle='--',
+                              zorder=zorder + 2)
+            gl.top_labels = False
+            gl.right_labels = False
+
+            plot_kwargs = set_plot_kwargs(ds[vname].where(ds['cellDistance']
+                                                          <= border_radius))
+            plot_mpas_darray(ds, vname, ax=ax, title='',
+                             border_radius=border_radius,
+                             **plot_kwargs)
+            plot_expected_resolution_rings(ds, ax=ax)
+            plot_wrf_grid(ds, ax=ax)
+            add_colorbar(ax, label=vname + ' (' + units + ')', **plot_kwargs)
+            ax.set_title(str(int(border_radius)) + 'km zoom', fontsize=14)
+            close_plot(outfile=DATA_FOLDER + '/' + name + '.regionmesh.' +
+                               str(border_radius) + '.png', size_fig=[6, 4])
+
+        regionalbig_mesh = DATA_FOLDER + '/' + name + '.regionbig.grid.nc'
+        if not os.path.exists(regionalbig_mesh):
+            cut_circular_region_beta(global_mesh, 2000 * 1000,
+                                     regional_grid=regionalbig_mesh,
+                                     num_boundary_layers=8,
+                                     lat_cen=0., lon_cen=0.)
+
+        ds = open_mpas_regional_file(regionalbig_mesh, full=True,
+                                     lat_ref=0., lon_ref=0.)
+
+        ds.attrs = myats
+        ds.attrs['vtx-param-lat_ref'] = 0.
+        ds.attrs['vtx-param-lon_ref'] = 0.
+        print(ds.attrs)
+
+        for border_radius in [size + 10, radius, region_border,
+                              500, 1000, 3000, 6000]:
+            ax = plt.axes(projection=ccrs.PlateCarree())
+            zorder = 2
+            ax.add_feature(cfeature.BORDERS, linestyle=':', zorder=zorder)
+            ax.stock_img()
+            ax.coastlines(resolution='10m', zorder=zorder + 1)
+
+            gl = ax.gridlines(draw_labels=True, alpha=0., linestyle='--',
+                              zorder=zorder + 2)
+            gl.top_labels = False
+            gl.right_labels = False
+
+            plot_kwargs = set_plot_kwargs(ds[vname].where(ds['cellDistance']
+                                                          <= border_radius))
+            plot_mpas_darray(ds, vname, ax=ax, title='',
+                             border_radius=border_radius,
+                             **plot_kwargs)
+            plot_expected_resolution_rings(ds, ax=ax)
+            add_colorbar(ax, label=vname + ' (' + units + ')', **plot_kwargs)
+            ax.set_title(str(int(border_radius)) + 'km zoom', fontsize=14)
+            close_plot(outfile=DATA_FOLDER + '/' + name + '.mpasmesh.' +
+                               str(border_radius) + '.png', size_fig=[6, 4])
 
         f = DATA_FOLDER + '/' + name + '.resolution_mesh.png'
         if not os.path.isfile(f):
@@ -118,7 +233,6 @@ for margin in [50, 75, 100, 125, 150, 250]:
         print('\nDONE. This is the mesh ' + regional_mesh)
         grids.append(regional_mesh)
 
-        break
 
 info = pd.DataFrame.from_dict(details, orient='index')
 print(info)
