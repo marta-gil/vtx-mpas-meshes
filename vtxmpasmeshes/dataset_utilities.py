@@ -211,38 +211,6 @@ def compute_metrics_edge_lengths(ds):
     return ds
 
 
-def compute_metrics_triangle_quality(ds):
-    distances = []
-
-    for i, vertex in enumerate(ds['nVertices'].values):
-        vals = ds['cellsOnVertex'].sel(nVertices=vertex).values
-
-        lats = ds['latitude'].values[vals]
-        lons = ds['longitude'].values[vals]
-        lat_ref = lats[-1]
-        lon_ref = lons[-1]
-
-        my_cell_dists = []
-        for i in range(3):
-            d = distance_latlon_matrix(lats[i], lons[i],
-                                       lat_ref=lat_ref,
-                                       lon_ref=lon_ref, do_tile=False)
-
-            my_cell_dists.append(d)
-            lat_ref, lon_ref = lats[i], lons[i]
-        distances.append(my_cell_dists)
-
-    ds['t_edgesLength'] = xr.DataArray(data=distances,
-                                       dims=('nVertices', 3))
-    ds['t_edgesLength'].attrs = {
-        'name': 'Length of edges for a triangle',
-        'units': 'km',
-        'long_name': 'Haversine distance between adjacent center '
-                     'cells of a vertex.'
-    }
-    return ds
-
-
 def add_distance_to_reference(ds, **kwargs):
     lat_ref = kwargs.get('lat_ref', ds.attrs.get('vtx-param-lat_ref', None))
     lon_ref = kwargs.get('lon_ref', ds.attrs.get('vtx-param-lon_ref', None))
@@ -456,7 +424,11 @@ def equivalent_wrf_domains(resolutions, diameters,
                              'be same length')
 
     highresolution = int(resolutions[0])
-    if not resolutions[-1] is None:
+    if resolutions[-1] is None:
+        num_domains = len(resolutions)
+        resol_nests = [int(highresolution * 3 ** i) for i in
+                       range(max_domains)]
+    else:
         lowresolution = int(resolutions[-1])
 
         # Find resolution outer domain
@@ -464,11 +436,8 @@ def equivalent_wrf_domains(resolutions, diameters,
         # find the option closest to lowresolution
         dists = [abs(lowresolution - option) for option in options]
         mindist = np.argmin(dists)
-        resol_nests = options[:(mindist+1)]
+        resol_nests = options[:(mindist + 1)]
         num_domains = len(resol_nests)
-    else:
-        num_domains = len(resolutions)
-        resol_nests = [int(highresolution * 3 ** i) for i in range(max_domains)]
 
     domains_def = {
         'max_domains': str(num_domains),
@@ -487,8 +456,12 @@ def equivalent_wrf_domains(resolutions, diameters,
         # Number of cells
         diameter = diameters[nest]
         if diameter is None:
+            if nest == 0:
+                prev_num_cells = 0
+            else:
+                prev_num_cells = num_cells[nest - 1]
             wrf_cells = find_min_number_wrf_cells(
-                previous_domain_cells=num_cells[nest - 1],
+                previous_domain_cells=prev_num_cells,
                 margin_cells_each_side=9)
         else:
             wrf_cells = find_min_number_wrf_cells(
@@ -544,7 +517,13 @@ def mpas_mesh_equivalent_wrf(ds, **kwargs):
     else:
         outerdiam = None
 
-    ewrf = equivalent_wrf_domains([highresolution, lowresolution],
-                                  [innerdiam, outerdiam], silent=True)
+    if highresolution >= 3.:
+        ewrf = equivalent_wrf_domains([highresolution, lowresolution],
+                                      [innerdiam, outerdiam], silent=True)
+    else:
+        ewrf = equivalent_wrf_domains([highresolution, None, None],
+                                      [innerdiam, None, outerdiam],
+                                      silent=True)
+
     return ewrf
 
