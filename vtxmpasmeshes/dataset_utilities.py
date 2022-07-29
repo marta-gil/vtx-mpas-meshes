@@ -454,18 +454,20 @@ def equivalent_wrf_domains(resolutions, diameters,
         domains_def['d' + str(domain) + 'res'] = str(resol_nests[nest])
 
         # Number of cells
+        if nest == 0:
+            prev_num_cells = 0
+        else:
+            prev_num_cells = num_cells[nest - 1]
+
         diameter = diameters[nest]
         if diameter is None:
-            if nest == 0:
-                prev_num_cells = 0
-            else:
-                prev_num_cells = num_cells[nest - 1]
             wrf_cells = find_min_number_wrf_cells(
                 previous_domain_cells=prev_num_cells,
                 margin_cells_each_side=9)
         else:
             wrf_cells = find_min_number_wrf_cells(
-                distance_km=diameter, resolution_km=resol_nests[nest])
+                distance_km=diameter, resolution_km=resol_nests[nest],
+                previous_domain_cells=prev_num_cells)
         num_cells[nest] = wrf_cells
 
         domains_def['d' + str(domain) + 'e_wesn'] = \
@@ -481,10 +483,12 @@ def equivalent_wrf_domains(resolutions, diameters,
         nest = num_domains - domain
 
         if domain == 1:
-            print('Lowest Resolution domain')
+            if not silent:
+                print('Lowest Resolution domain')
             dij = 1
         else:
-            print('Inner domain')
+            if not silent:
+                print('Inner domain')
             # quantes celes del domini superior (domain-1) ocupa?
             upper_cells_total = num_cells[nest + 1] - 1
             upper_cells_covered = (num_cells[nest] - 1) / 3
@@ -523,6 +527,7 @@ def mpas_mesh_equivalent_wrf(ds, **kwargs):
     else:
         ewrf = equivalent_wrf_domains([highresolution, None, None],
                                       [innerdiam, None, outerdiam],
+                                      max_domains=3,
                                       silent=True)
 
     return ewrf
