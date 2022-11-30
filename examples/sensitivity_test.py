@@ -31,10 +31,14 @@ numlayers = 8
 
 details = {}
 grids = []
-for margin in [50, 75, 100,
+for margin in [#50,
+               75,
+               #100,
                #125, 150, 250
                ]:
-    for size in [15, 25, 30,
+    for size in [#15,
+                 20, 25,
+                 #30,
                  #35, 50
                  ]:
 
