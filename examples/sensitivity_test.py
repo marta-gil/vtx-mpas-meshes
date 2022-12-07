@@ -32,14 +32,15 @@ numlayers = 8
 details = {}
 grids = []
 for margin in [#50,
-               75,
+               #75,
                #100,
-               #125, 150, 250
+               125,
+               #150, 250
                ]:
     for size in [#15,
-                 20, 25,
-                 #30,
-                 #35, 50
+                 #20, 25,
+                 30, 35,
+                 #50
                  ]:
 
         name = 'senst_s' + str(size).zfill(2) + '_m' + str(margin).zfill(3)
