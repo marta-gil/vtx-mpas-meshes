@@ -1,6 +1,7 @@
 # vtx-mpas-meshes
 Creation and analysis of MPAS-WRF meshes by Vortex
 
+Focusing on light regional meshes that allow to simulate a small region using reanalysis with resolution approx 30km.
 
 Work under progress.
 Example of regional mesh:
@@ -567,3 +568,112 @@ And we get the mesh:
 ![examples/catalonia_soft/distortion_mesh.png](examples/catalonia_soft/distortion_mesh.png)
 
 that shows little distortion on the central cells.
+
+We can check the metadata that are stored on the grid netCDF to see how long did the process take, and the parameters used. We see all the process took 269.98s. Quite good!
+```console
+$ncdump -h catalonia_soft/catalonia_soft.grid.nc 
+netcdf catalonia_soft.grid {
+dimensions:
+        Time = UNLIMITED ; // (0 currently)
+        nCells = 37120 ;
+        nEdges = 111655 ;
+        nVertices = 74536 ;
+        maxEdges = 8 ;
+        maxEdges2 = 16 ;
+        TWO = 2 ;
+        vertexDegree = 3 ;
+variables:
+        int bdyMaskCell(nCells) ;
+        int bdyMaskEdge(nEdges) ;
+        int bdyMaskVertex(nVertices) ;
+        double latCell(nCells) ;
+                latCell:_FillValue = NaN ;
+        double lonCell(nCells) ;
+                lonCell:_FillValue = NaN ;
+        double xCell(nCells) ;
+                xCell:_FillValue = NaN ;
+        double yCell(nCells) ;
+                yCell:_FillValue = NaN ;
+        double zCell(nCells) ;
+                zCell:_FillValue = NaN ;
+        int indexToCellID(nCells) ;
+        double latEdge(nEdges) ;
+                latEdge:_FillValue = NaN ;
+        double lonEdge(nEdges) ;
+                lonEdge:_FillValue = NaN ;
+        double xEdge(nEdges) ;
+                xEdge:_FillValue = NaN ;
+        double yEdge(nEdges) ;
+                yEdge:_FillValue = NaN ;
+        double zEdge(nEdges) ;
+                zEdge:_FillValue = NaN ;
+        int indexToEdgeID(nEdges) ;
+        double latVertex(nVertices) ;
+                latVertex:_FillValue = NaN ;
+        double lonVertex(nVertices) ;
+                lonVertex:_FillValue = NaN ;
+        double xVertex(nVertices) ;
+                xVertex:_FillValue = NaN ;
+        double yVertex(nVertices) ;
+                yVertex:_FillValue = NaN ;
+        double zVertex(nVertices) ;
+                zVertex:_FillValue = NaN ;
+        int indexToVertexID(nVertices) ;
+        int cellsOnCell(nCells, maxEdges) ;
+        int edgesOnCell(nCells, maxEdges) ;
+        int verticesOnCell(nCells, maxEdges) ;
+        int nEdgesOnCell(nCells) ;
+        int edgesOnEdge(nEdges, maxEdges2) ;
+        int cellsOnEdge(nEdges, TWO) ;
+        int verticesOnEdge(nEdges, TWO) ;
+        int nEdgesOnEdge(nEdges) ;
+        int cellsOnVertex(nVertices, vertexDegree) ;
+        int edgesOnVertex(nVertices, vertexDegree) ;
+        int boundaryVertex(nVertices) ;
+        double areaCell(nCells) ;
+                areaCell:_FillValue = NaN ;
+        double angleEdge(nEdges) ;
+                angleEdge:_FillValue = NaN ;
+        double dcEdge(nEdges) ;
+                dcEdge:_FillValue = NaN ;
+        double dvEdge(nEdges) ;
+                dvEdge:_FillValue = NaN ;
+        double weightsOnEdge(nEdges, maxEdges2) ;
+                weightsOnEdge:_FillValue = NaN ;
+        double areaTriangle(nVertices) ;
+                areaTriangle:_FillValue = NaN ;
+        double kiteAreasOnVertex(nVertices, vertexDegree) ;
+                kiteAreasOnVertex:_FillValue = NaN ;
+        double cellQuality(nCells) ;
+                cellQuality:_FillValue = NaN ;
+        double gridSpacing(nCells) ;
+                gridSpacing:_FillValue = NaN ;
+        double triangleQuality(nVertices) ;
+                triangleQuality:_FillValue = NaN ;
+        double triangleAngleQuality(nVertices) ;
+                triangleAngleQuality:_FillValue = NaN ;
+        int obtuseTriangle(nVertices) ;
+        double meshDensity(nCells) ;
+                meshDensity:_FillValue = NaN ;
+
+// global attributes:
+                :on_a_sphere = "YES" ;
+                :sphere_radius = 1. ;
+                :vtx-param-highresolution = 3. ;
+                :vtx-param-lowresolution = 20. ;
+                :vtx-param-size = 200. ;
+                :vtx-param-margin = 500. ;
+                :vtx-param-lat_ref = 41.5 ;
+                :vtx-param-lon_ref = 1.5 ;
+                :vtx-param-final_res_dist = 1000LL ;
+                :vtx-param-radius = 700. ;
+                :vtx-param-buffer = 200. ;
+                :vtx-param-border = 900. ;
+                :vtx-region-num_boundary_layers = 8LL ;
+                :vtx-region_border = 796. ;
+                :vtx-duration-resolution = "15.46" ;
+                :vtx-duration-generation = "244.51" ;
+                :vtx-duration-region = "10.01" ;
+                :vtx-duration-total = "269.98" ;
+}
+```
