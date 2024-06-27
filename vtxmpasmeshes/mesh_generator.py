@@ -14,7 +14,7 @@ from vtxmpasmeshes.mpas_plots import view_resolution_map, \
     view_mpas_regional_mesh
 from vtxmpasmeshes.dataset_utilities import distance_latlon_matrix
 
-PATH_LIMITED_AREA = '/home/marta/PycharmProjects/MPAS-Limited-Area'
+PATH_LIMITED_AREA = os.environ.get('PATH_LIMITED_AREA')
 
 
 def apply_resolution_at_distance(distances, ref_points, ref_resolutions):
@@ -176,8 +176,7 @@ def cut_circular_region(mpas_global_file,
         raise IOError('The path to the MPAS-Limited-Area folder is not '
                       'correct. Pass it to the function '
                       'cut_circular_region_beta or define a correct '
-                      'default in variable PATH_LIMITED_AREA (in '
-                      'mesh_generator.py.')
+                      'default in environment variable PATH_LIMITED_AREA')
 
     print('\n>> Cutting a circular region')
     print('\t centered at %.4f, %.4f' % (lat_cen, lon_cen))
