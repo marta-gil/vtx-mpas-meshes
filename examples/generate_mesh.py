@@ -98,7 +98,7 @@ if os.path.isdir(folder):
     if not args.overwrite:
         print('Sure to overwrite?')
         raise IOError('For security, overwriting is disabled. Give '
-                      'different tests different names or erase the'
+                      'different tests different names or erase the '
                       'existing folder: ' + folder)
     else:
         print('Overwriting folder ' + folder)

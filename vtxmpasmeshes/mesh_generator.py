@@ -172,7 +172,8 @@ def cut_circular_region(mpas_global_file,
                         path_create_region=PATH_LIMITED_AREA,
                         ):
 
-    if not os.path.isdir(path_create_region):
+    if PATH_LIMITED_AREA is None or not os.path.isdir(path_create_region):
+        print('PATH_LIMITED_AREA', PATH_LIMITED_AREA)
         raise IOError('The path to the MPAS-Limited-Area folder is not '
                       'correct. Pass it to the function '
                       'cut_circular_region_beta or define a correct '
@@ -237,12 +238,12 @@ def cut_circular_region_beta(mpas_global_file,
                              path_create_region=PATH_LIMITED_AREA,
                              ):
 
-    if not os.path.isdir(path_create_region):
+    if PATH_LIMITED_AREA is None or not os.path.isdir(path_create_region):
+        print('PATH_LIMITED_AREA', PATH_LIMITED_AREA)
         raise IOError('The path to the MPAS-Limited-Area folder is not '
                       'correct. Pass it to the function '
                       'cut_circular_region_beta or define a correct '
-                      'default in variable PATH_LIMITED_AREA (in '
-                      'mesh_generator.py.')
+                      'default in environment variable PATH_LIMITED_AREA')
 
     create_region_exec = path_create_region + '/create_region_no_file'
     if not os.path.isfile(create_region_exec):
