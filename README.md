@@ -540,3 +540,30 @@ DONE. This is the mesh ./zoomin/zoomin.grid.nc
 resolution_mesh.png  resolution.pdf  zoomin.grid.graph.info  zoomin.grid.nc
 ```
 
+The resolution of the cells (defined as the diameter of a circle of the same area of the cell) is:
+
+![examples/zoomin_ref/resolution_mesh.png](examples/zoomin_ref/resolution_mesh.png)
+
+and we also get the distortion of the cells:
+
+![examples/zoomin_ref/distortion_mesh.png](examples/zoomin_ref/distortion_mesh.png)
+
+were `cellDistortion` is defined as in this [article], and is an indicator of mesh quality.
+
+[article]: https://pedrosp.ime.usp.br/papers/PeixotoBarros2013.pdf
+
+
+## More examples: larger mesh
+
+We can also do larger meshes. For example:
+
+    ```console
+    (<envname>) ~/vtx-mpas-meshes/examples$ python generate_mesh.py -f catalonia_soft -highr 3 -lowr 20 -size 200 -margin 500 -lat 41.5 -lon 1.5 -p -o -r
+
+And we get the mesh:
+
+![examples/catalonia_soft/resolution_mesh.png](examples/catalonia_soft/resolution_mesh.png)
+
+![examples/catalonia_soft/distortion_mesh.png](examples/catalonia_soft/distortion_mesh.png)
+
+that shows little distortion on the central cells.
