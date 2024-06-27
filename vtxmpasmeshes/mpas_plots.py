@@ -42,7 +42,7 @@ def view_resolution_map(ds, pdfname=None, list_distances=None, **kwargs):
     mylon = int(my_zero['lon'])
 
     # Create a one-dimensional radial array from the center
-    axis = region.isel(lat=mylat, lon=range(mylon, region.dims['lon']))
+    axis = region.isel(lat=mylat, lon=range(mylon, region.sizes['lon']))
     axis = axis.squeeze(drop=True)
     axis = axis.assign_coords({'distance': axis['distance']})
     axis = axis.swap_dims({'lon': 'distance'})
@@ -277,7 +277,7 @@ def compare_plot_mpas_regional_meshes(list_mesh_files, outfile=None,
         i, j = m // ncols, m % ncols
 
         each_title = kwargs.get('each_title', '<NAME>')
-        ncells = str(datasets[m].dims['nCells'])
+        ncells = str(datasets[m].sizes['nCells'])
         each_title = each_title.replace('<NAME>', name)
         each_title = each_title.replace('<NCELLS>', ncells)
 

@@ -57,14 +57,28 @@ It uses:
 
 If regions want to be cut, you will also need the repository
 * https://github.com/marta-gil/MPAS-Limited-Area.git
-that expands a bit on the official MPAS-Limited-Area code.
-
-## Test environment
-
-A way to test your environement works (it easily will not, please contact me if you have issues at marta.gil@vortexfdc.com)
+that expands a bit on the official MPAS-Limited-Area code. In this case, one needs to set the path to the MPAS-Limited-Area code as an environment variable.
 
 ```
-(vtx-mpas-tools) vtx-mpas-meshes/examples$ python generate_mesh.py -h
+$ export PATH_LIMITED_AREA=</path/to/marta's/version/of/MPAS-Limited-Area>
+```
+Note that, theoretically, the original code from which I forked my branch should work as well, but you will need to manually make sure `cut_circular_region_beta` is not called (and use `cut_circular_region` instead). There are more comments about this inside the code.
+
+
+## Example of mesh generation
+
+Let's do a regional mesh that has a central region of 3km resolution and radius 30km, with a margin of 150km where the resolution increases up to 30km, centered at 41.0000, 1.0000. We will plot the resolution map and the mesh will be cut to represent the region.
+
+The output can be seen in the `examples/zoomin_ref` folder.
+
+The regional mesh has 1580 cells, no obtuse triangles and the full process took 63s!
+
+
+```console
+~$ export PATH_LIMITED_AREA=</path/to/MPAS-Limited-Area>
+~$ conda activate <envname>
+~$ cd vtx-mpas-meshes/examples
+(<envname>) ~/vtx-mpas-meshes/examples$ python generate_mesh.py -h
 usage: generate_mesh.py [-h] [-f FOLDER_NAME] [-b BASE_PATH] [-g GRID_KIND] [-highr HIGHRESOLUTION] [-lowr LOWRESOLUTION] [-size SIZE]
                         [-margin MARGIN] [-lat LAT_REF] [-lon LON_REF] [-p] [-r] [-o]
 
@@ -107,34 +121,7 @@ optional arguments:
   -p, --withplots       generate plots to view the mesh.
   -r, --do_region       cut the region out of the mesh.
   -o, --overwrite       overwrite existing folder.
-  
-```
-
-Another important thing is to set the path to the MPAS-Limited-Area code as an environment variable.
-
-```
-$ export PATH_LIMITED_AREA=</path/to/MPAS-Limited-Area>
-```
-
-The version of the code used is a personal branch: https://github.com/marta-gil/MPAS-Limited-Area.git
-where I expanded the original create_region script to be more flexible. 
-Theoretically, the original code should work as well, but one you will need to manually make sure `cut_circular_region_beta` is not called (and use `cut_circular_region` instead). There are more comments about this inside the code.
-
-
-## Example of mesh generation
-
-Let's do a regional mesh that has a central region of 3km resolution and radius 30km, with a margin of 150km where the resolution increases up to 30km, centered at 41.0000, 1.0000. We will plot the resolution map and the mesh will be cut to represent the region.
-
-The output can be seen in the `examples/zoomin_ref` folder.
-
-The regional mesh has 1580 cells, no obtuse triangles and the full process took 63s!
-
-
-```
-~$ export PATH_LIMITED_AREA=</path/to/MPAS-Limited-Area>
-~$ conda activate vtx-mpas-tools
-~$ cd vtx-mpas-meshes/examples
-(vtx-mpas-tools) ~/vtx-mpas-meshes/examples$ python generate_mesh.py -f zoomin -highr 3 -lowr 30 -size 30 -margin 150 -lat 41 -lon 1 -p -r -o
+(<envname>) ~/vtx-mpas-meshes/examples$ python generate_mesh.py -f zoomin -highr 3 -lowr 30 -size 30 -margin 150 -lat 41 -lon 1 -p -r -o
 Overwriting folder ./zoomin
 
 >> Creating a variable resolution map
@@ -549,7 +536,7 @@ Resolution Plots
 ******************************
 
 DONE. This is the mesh ./zoomin/zoomin.grid.nc
-(vtx-mpas) marta@cloud1:~/MPAS/vtx-mpas-meshes/examples$ ls zoomin/
+(<envname>) marta@cloud1:~/MPAS/vtx-mpas-meshes/examples$ ls zoomin/
 resolution_mesh.png  resolution.pdf  zoomin.grid.graph.info  zoomin.grid.nc
 ```
 

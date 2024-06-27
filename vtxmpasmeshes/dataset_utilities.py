@@ -140,7 +140,7 @@ def compute_metrics_edge_lengths(ds):
         lon_ref = lons[-1]
 
         my_cell_dists = []
-        for i in range(ds.dims['maxEdges']):
+        for i in range(ds.sizes['maxEdges']):
             if i >= num_sides:
                 my_cell_dists.append(np.nan)
                 continue
