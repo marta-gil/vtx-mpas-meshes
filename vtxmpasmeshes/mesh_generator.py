@@ -387,4 +387,19 @@ def full_generation_process(mpas_grid_file, grid, redo=True,
             view_mpas_regional_mesh(mpas_grid_file,
                                     outfile=path_save + '/resolution_mesh.png')
 
+            print('Distortion Plots')
+            view_mpas_regional_mesh(mpas_grid_file, vname='cellDistortion',
+                                    cmap='Reds', vmin=0, vmax=0.5,
+                                    outfile=path_save + '/distortion_mesh.png')
+        else:
+            print('Global meshes give problems with the plots! TODO')
+            # # BETA (can we plot global meshes?)
+            # print('Resolution Plots - BETA global mesh! can take too much time')
+            # view_mpas_regional_mesh(mpas_grid_file,
+            #                         outfile=path_save + '/resolution_mesh.png')
+            #
+            # print('Distortion Plots - BETA global mesh! can take too much time')
+            # view_mpas_regional_mesh(mpas_grid_file, vname='cellDistortion', cmap='Reds',
+            #                         outfile=path_save + '/distortion_mesh.png')
+
     return mpas_grid_file, graph_info_file
