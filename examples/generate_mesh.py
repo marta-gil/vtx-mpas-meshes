@@ -3,19 +3,22 @@ import os
 
 from vtxmpasmeshes.mesh_generator import full_generation_process
 
-DATA_FOLDER = '/home/marta/PycharmProjects/vtx-mpas-meshes/data'
-
 parser = argparse.ArgumentParser(
     description=__doc__,
     formatter_class=argparse.RawTextHelpFormatter)
 
 parser.add_argument(
-    "-n", "--name", default="doughnut", type=str,
-    help="output basename for directory and files."
+    "-f", "--folder_name", default="doughnut_mesh", type=str,
+    help="output folder for mesh files."
 )
 
 parser.add_argument(
-    "-g", "--grid", type=str, default='doughnut',
+    "-b", "--base_path", default=".", type=str,
+    help="basepath where we want to create the folder."
+)
+
+parser.add_argument(
+    "-g", "--grid_kind", type=str, default='doughnut',
     help="""
         Grid option: \n 
         "  doughnut": 
@@ -70,6 +73,12 @@ parser.add_argument(
     help="generate plots to view the mesh.",
 )
 
+# -r generates plots
+parser.add_argument(
+    "-r", "--do_region", action="store_true",
+    help="cut the region out of the mesh.",
+)
+
 # -o overwrite
 parser.add_argument(
     "-o", "--overwrite", action="store_true",
@@ -78,10 +87,12 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-if args.name == '':
+if args.folder_name == '':
     raise ValueError('Please give a non trivial name.')
+if args.base_path == '':
+    raise ValueError('Please give a non trivial base_path.')
 
-folder = DATA_FOLDER + '/' + args.name + '/'
+folder = args.base_path + '/' + args.folder_name
 
 if os.path.isdir(folder):
     if not args.overwrite:
@@ -94,11 +105,11 @@ if os.path.isdir(folder):
         os.system('rm -rf ' + folder)
 
 os.system('mkdir -p ' + folder)
-basename = folder + args.name
+grid_name = folder + '/' + args.folder_name + '.grid.nc'
 
 mesh_file, mesh_graph_info = full_generation_process(
-    basename + '.grid.nc',
-    args.grid,
+    grid_name,
+    args.grid_kind,
     redo=args.overwrite,
     do_plots=args.withplots,
     highresolution=args.highresolution,
@@ -107,6 +118,7 @@ mesh_file, mesh_graph_info = full_generation_process(
     margin=args.margin,
     lat_ref=args.lat_ref,
     lon_ref=args.lon_ref,
+    do_region=args.do_region,
 )
 
 print('\n' + '*' * 30)
